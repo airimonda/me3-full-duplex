@@ -1,0 +1,15 @@
+# ME3 — full-duplex voice agent (Mac executor side)
+# Python 3.11 (Apple Silicon macOS). Install: make setup  (or: uv pip install -r requirements.txt)
+
+pipecat-ai[websocket]==1.14.0
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx==0.28.1
+kokoro==0.9.4
+mlx==0.32.4
+mlx-whisper==0.4.3
+onnxruntime==1.31.0
+resemblyzer==0.1.4
+sounddevice==0.5.6
+soundfile==0.13.1
+numpy
