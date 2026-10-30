@@ -91,6 +91,21 @@ _PROMPT_GATE = (
 SYSTEM_PROMPT = _PROMPT_BASE + _PROMPT_GATE
 SYSTEM_PROMPT_MIC = _PROMPT_BASE
 
+# filler-only utterances and Whisper's classic hallucinations on short quiet
+# bursts / TV audio (ported from chat.py)
+FILLERS = {"um", "uh", "mhm", "hmm", "uh-huh", "huh", "mm", "yeah", "okay", "ok"}
+WHISPER_GHOSTS = {
+    "thank you", "thank you very much", "thanks", "thanks for watching",
+    "thanks for watching my video", "see you next time",
+    "hello", "hi", "hey", "you", "so", "and", "the", "a", "i", "it",
+    "mmhmm", "amen", "and you", "you know", "i know", "my pleasure",
+    "go to see you in the next video", "see you in the next video",
+    "wharton", "watch on", "button",
+}
+
+def _token_set(s):
+    return set(re.findall(r"[a-z0-9']+", s.lower()))
+
 _IN_SR = 16000
 _OUT_SR = 24000
 _ENDPOINT_MS = 600
@@ -320,17 +335,6 @@ class WatsonAgent(FrameProcessor):
         return ack
 
     async def _respond(self, utt_pcm: bytes):
-        prev = self.respond_task
-        if prev is not None and not prev.done():
-            # a new utterance arrived while a reply was generating/playing:
-            # the new one supersedes the old — kill its stream and playback
-            self.gen += 1
-            self.playing = False
-            from pipecat.frames.frames import InterruptionFrame
-            from pipecat.processors.frame_processor import FrameDirection
-            await self.push_frame(InterruptionFrame(), direction=FrameDirection.DOWNSTREAM)
-            self.log_event("superseded")
-        self.respond_task = asyncio.current_task()
         t0 = time.perf_counter()
         gen = self.gen
         # volume gate: TV/radio clips sit far below live speech level
@@ -344,6 +348,16 @@ class WatsonAgent(FrameProcessor):
         if not text or len(text.strip()) < 2:
             return
         self.log_event("asr", text=text, asr_s=round(t_asr - t0, 3))
+        # ghost filter: Whisper's classic hallucinations on short bursts / TV
+        # audio — drop before they count as speech or touch the voice profile
+        norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
+        no_wake = not norm.startswith("watson")
+        if no_wake and norm in WHISPER_GHOSTS:
+            self.log_event("ghost_ignored", user=text)
+            return
+        if no_wake and _token_set(text) <= FILLERS:
+            self.log_event("filler_ignored", user=text)
+            return
         # wake-word handling: bare "Watson" -> greet; "Watson, ..." -> strip the
         # wake word and ALWAYS answer (never let the SILENT gate eat a command)
         low = text.strip().lower().strip(".,!? ")
@@ -391,6 +405,17 @@ class WatsonAgent(FrameProcessor):
                     self.speaker = emb
                     self.log_event("enrolled")
         # bench mode: no voice gate — benchmark clips are not enrolled speakers
+        # a NEW accepted utterance supersedes an in-flight reply (fragments and
+        # ghosts never got here — they can't kill the real reply)
+        prev = self.respond_task
+        if prev is not None and not prev.done():
+            self.gen += 1
+            self.playing = False
+            from pipecat.frames.frames import InterruptionFrame
+            from pipecat.processors.frame_processor import FrameDirection
+            await self.push_frame(InterruptionFrame(), direction=FrameDirection.DOWNSTREAM)
+            self.log_event("superseded")
+        self.respond_task = asyncio.current_task()
         # --- direct handoff: "have the agent do X" skips the LLM entirely ---
         m = re.search(r"have the agent\s+(?:do\s+|build\s+|make\s+|create\s+|write\s+|fix\s+|research\s+|find\s+|set\s+up\s+)?(.+)", text, re.I)
         if not m:
