@@ -3,7 +3,7 @@ import subprocess
 import sys
 import time
 
-sys.path.insert(0, "${HOME}/me3")
+sys.path.insert(0, str(Path.home() / "me3") + "")
 import tasks as T
 
 a = T.submit_task("write a file hello1.txt containing the text hello one")
@@ -16,7 +16,7 @@ print("running after 10s:", running, flush=True)
 for tid in (a, b):
     if tid is None:
         continue
-    ps = subprocess.run(["pgrep", "-f", f"--in ${HOME}/me3/tasks/{tid}"],
+    ps = subprocess.run(["pgrep", "-f", f"--in ~/me3/tasks/{tid}"],
                         capture_output=True, text=True)
     print(f"{tid} hermes pid(s): {ps.stdout.strip() or 'none'}", flush=True)
 

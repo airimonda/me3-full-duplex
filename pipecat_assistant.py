@@ -40,7 +40,7 @@ TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "openai/gpt-4o-mini")
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
 ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3
-DGX3 = "http://<dgx3-host>"                  # port 8000 ASR, 8001 TTS (VPN/DILNET)
+DGX3 = os.environ.get("DGX3_HOST", "")         # e.g. http://10.x.x.x; empty = local backends only
 DGX3_ASR_MODEL = "Qwen/Qwen2-Audio-7B-Instruct"
 DGX3_TTS_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 
@@ -175,7 +175,7 @@ class WatsonAgent(FrameProcessor):
         self.play_ref = None           # pcm currently being played (echo reference)
         self.play_pos = 0              # samples of play_ref already pushed
         # speaker enrollment: same profile file as the live loop (chat.py)
-        sys.path.insert(0, "${HOME}/me3")
+        sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
         import chat as chatbrain      # QUICK_TOOLS + execute_tool (single source of truth)
         import tasks as taskmgr       # sandboxed Hermes delegation

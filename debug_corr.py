@@ -2,7 +2,7 @@ import numpy as np
 from duplex import xcorr_echo_score
 import bench_duplex as B
 
-agent = B.load_wav("${HOME}/me3/tts_out_1.wav")
+agent = B.load_wav(str(Path.home() / "me3") + "/tts_out_1.wav")
 SR = 16000
 d = int(0.024 * SR)
 

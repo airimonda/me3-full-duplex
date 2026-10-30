@@ -28,7 +28,7 @@
     },
     "devices": {},
     "warnings_overridden": [],
-    "dataset": "${HOME}/me3/fd-benchmark/datasets",
+    "dataset": str(Path.home() / "me3") + "/fd-benchmark/datasets",
     "dataset_counts": {
       "v1_pause_synth": 30,
       "v1_pause_candor": 30,
@@ -100,12 +100,12 @@
       },
       {
         "ok": true,
-        "text": "assistant project: ${HOME}/me3",
+        "text": "assistant project: ~/me3",
         "fix": "clone fd-benchmark inside the project folder, or set FDBENCH_PROJECT in fd-benchmark/.env"
       },
       {
         "ok": true,
-        "text": "assistant python: ${HOME}/me3/venv/bin/python",
+        "text": "assistant python: ~/me3/venv/bin/python",
         "fix": "create the project's venv, or set FDBENCH_ASSISTANT_PYTHON in fd-benchmark/.env"
       },
       {

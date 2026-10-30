@@ -2,7 +2,7 @@
 import sys
 import time
 
-sys.path.insert(0, "${HOME}/me3")
+sys.path.insert(0, str(Path.home() / "me3") + "")
 import chat  # noqa: E402  (imports loop, HTTP, tools)
 
 key = chat.load_openrouter_key()

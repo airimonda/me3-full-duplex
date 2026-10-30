@@ -1,5 +1,5 @@
 import sys, time
-sys.path.insert(0, "${HOME}/me3")
+sys.path.insert(0, str(Path.home() / "me3") + "")
 import chat
 
 key = chat.load_openrouter_key()

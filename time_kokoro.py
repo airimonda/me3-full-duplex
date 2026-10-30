@@ -24,7 +24,7 @@ for i, text in enumerate(texts):
         frames.append(audio)
     total_s = time.perf_counter() - t
     audio_all = np.concatenate(frames)
-    wav_path = f"${HOME}/me3/tts_out_{i}.wav"
+    wav_path = fstr(Path.home() / "me3") + "/tts_out_{i}.wav"
     with wave.open(wav_path, "w") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
         w.writeframes((audio_all * 32767).astype(np.int16).tobytes())
@@ -32,4 +32,4 @@ for i, text in enumerate(texts):
                     "audio_len_s": round(len(audio_all)/sr, 2), "text": text})
     print(f"utt{i}: first chunk {first_chunk_s:.3f}s, total {total_s:.3f}s, audio {len(audio_all)/sr:.2f}s", flush=True)
 
-json.dump(results, open("${HOME}/me3/kokoro_timing.json", "w"), indent=2)
+json.dump(results, open(str(Path.home() / "me3") + "/kokoro_timing.json", "w"), indent=2)

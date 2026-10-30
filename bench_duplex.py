@@ -148,10 +148,10 @@ def sim_scenario(agent_wav, user_wav=None, user_start_s=None, params=None, user_
 
 
 def main():
-    agent = load_wav("${HOME}/me3/tts_out_1.wav")   # ~5s agent reply
-    barge = load_wav("${HOME}/me3/user_barge.wav")
-    back = load_wav("${HOME}/me3/user_backchannel.wav")
-    bg = load_wav("${HOME}/me3/user_bg.wav")
+    agent = load_wav(str(Path.home() / "me3") + "/tts_out_1.wav")   # ~5s agent reply
+    barge = load_wav(str(Path.home() / "me3") + "/user_barge.wav")
+    back = load_wav(str(Path.home() / "me3") + "/user_backchannel.wav")
+    bg = load_wav(str(Path.home() / "me3") + "/user_bg.wav")
 
     scenarios = {
         "interruption": dict(user_wav=barge, user_start_s=1.0, expect=True),
@@ -200,7 +200,7 @@ def main():
     if good:
         best = min(good, key=lambda x: (x["t_stop"] or 9999, x["pauses_silence"]))
         print("\nBEST (all scenarios correct, lowest t_stop):", json.dumps(best))
-        json.dump(rows, open("${HOME}/me3/bench_duplex_results.json", "w"), indent=2)
+        json.dump(rows, open(str(Path.home() / "me3") + "/bench_duplex_results.json", "w"), indent=2)
     else:
         print("\nNo config passed all scenarios — widen the grid.")
 
