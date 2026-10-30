@@ -1,0 +1,701 @@
+{
+  "session": {
+    "student": "me3",
+    "run_id": "2026-10-30_10-49-51",
+    "started": "2026-10-30T10:49:51+08:00",
+    "rounds": 2,
+    "seed": 922546,
+    "fdbench": "0.1.0",
+    "rig": "direct",
+    "judge": "openrouter/openai/gpt-4o",
+    "machine": {
+      "os": "Darwin 27.2.0",
+      "machine": "arm64",
+      "pi_model": null,
+      "ram_gb": 16.0,
+      "python": "3.11.16",
+      "network": "unknown",
+      "pi_temp_c": null,
+      "pi_throttled": null,
+      "disk_free_gb": 190.6,
+      "hostname": "Ailenes-MacBook-Air.local",
+      "optional": {
+        "ASR (faster-whisper)": true,
+        "pitch/intensity (praat-parselmouth)": true,
+        "UTMOSv2 quality": false
+      },
+      "fdbench": "0.1.0"
+    },
+    "devices": {},
+    "warnings_overridden": [],
+    "dataset": "${HOME}/me3/fd-benchmark/datasets",
+    "dataset_counts": {
+      "v1_pause_synth": 30,
+      "v1_pause_candor": 30,
+      "v1_turntaking": 30,
+      "v1_interrupt": 30,
+      "v15_interruption": 30,
+      "v15_backchannel": 30,
+      "v15_talking_to_other": 30,
+      "v15_background": 30,
+      "false_tt": 40
+    },
+    "where": "local",
+    "link": {
+      "peer": "127.0.0.1:59309",
+      "rtt_ms": 0.19199999223928899,
+      "host": "127.0.0.1",
+      "port": 8791,
+      "disconnects": 1
+    },
+    "finished": "2026-10-30T10:58:43+08:00",
+    "outcome": {
+      "completed": 20,
+      "total": 20,
+      "stopped_early": false,
+      "seconds": 526.4777691659983
+    }
+  },
+  "preflight": {
+    "checks": [
+      {
+        "ok": true,
+        "text": "Python 3.11.16",
+        "fix": "Python 3.10 or newer is needed"
+      },
+      {
+        "ok": true,
+        "text": "packages: core ok",
+        "fix": "pip install -r requirements.txt"
+      },
+      {
+        "ok": true,
+        "text": "scoring extras: ASR (faster-whisper), pitch/intensity (praat-parselmouth) · not installed: UTMOSv2 quality",
+        "fix": "pip install -r requirements-score.txt (laptop) to score transcripts and voice change"
+      },
+      {
+        "ok": true,
+        "text": "Darwin 27.2.0 (arm64) · 16.0 GB RAM · 190.6 GB free",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "network: unknown",
+        "fix": "use Ethernet if you can; Wi-Fi jitter widens latencies"
+      },
+      {
+        "ok": true,
+        "text": "datasets: 280 clips in 9 groups",
+        "fix": "python tools/fetch_datasets.py --force gets the full set"
+      },
+      {
+        "ok": true,
+        "text": "dataset checksums ok (sampled)",
+        "fix": "rebuild the datasets"
+      },
+      {
+        "ok": true,
+        "text": "rig: direct feed on ws://127.0.0.1:8791 (no audio devices used)",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "assistant project: ${HOME}/me3",
+        "fix": "clone fd-benchmark inside the project folder, or set FDBENCH_PROJECT in fd-benchmark/.env"
+      },
+      {
+        "ok": true,
+        "text": "assistant python: ${HOME}/me3/venv/bin/python",
+        "fix": "create the project's venv, or set FDBENCH_ASSISTANT_PYTHON in fd-benchmark/.env"
+      },
+      {
+        "ok": true,
+        "text": "judge: openrouter/openai/gpt-4o · reachable (OK)",
+        "fix": "check the API key / URL in .env"
+      }
+    ],
+    "info": {
+      "os": "Darwin 27.2.0",
+      "machine": "arm64",
+      "pi_model": null,
+      "ram_gb": 16.0,
+      "python": "3.11.16",
+      "network": "unknown",
+      "pi_temp_c": null,
+      "pi_throttled": null,
+      "disk_free_gb": 190.6,
+      "hostname": "Ailenes-MacBook-Air.local",
+      "optional": {
+        "ASR (faster-whisper)": true,
+        "pitch/intensity (praat-parselmouth)": true,
+        "UTMOSv2 quality": false
+      },
+      "fdbench": "0.1.0"
+    },
+    "devices": {}
+  },
+  "queue_summary": {
+    "rounds": 2,
+    "seed": 922546,
+    "total": 20,
+    "done": 20,
+    "skipped": 0,
+    "failed": 0
+  },
+  "fdbench": "0.1.0",
+  "scored_at": "2026-10-30T10:59:48+08:00",
+  "trials": 28,
+  "per_group": {
+    "v1_pause_synth": 2,
+    "v1_pause_candor": 2,
+    "v1_turntaking": 2,
+    "v1_interrupt": 2,
+    "false_tt": 4,
+    "v15_interruption": 2,
+    "v15_backchannel": 2,
+    "v15_talking_to_other": 2,
+    "v15_background": 2
+  },
+  "notes": [],
+  "judge": "openrouter/openai/gpt-4o",
+  "asr": "faster-whisper/small",
+  "metrics": {
+    "v1_pause_synth.tor": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v1_pause_candor.tor": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v1_turntaking.tor": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v1_turntaking.missed_rate": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v1_turntaking.latency": {
+      "n": 1,
+      "median": 2.7220000000000635,
+      "p95": 2.7220000000000635,
+      "mean": 2.7220000000000635,
+      "min": 2.7220000000000635,
+      "max": 2.7220000000000635,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "false_tt.rate": {
+      "n": 4,
+      "k": 1,
+      "value": 0.25,
+      "ci95": [
+        0.045586062644636216,
+        0.6993639475573634
+      ]
+    },
+    "false_tt.rate.side_talk": {
+      "n": 1,
+      "k": 1,
+      "value": 1.0,
+      "ci95": [
+        0.20654329147389294,
+        1.0
+      ]
+    },
+    "false_tt.rate.tv_radio": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.7934567085261071
+      ]
+    },
+    "false_tt.rate.background": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.7934567085261071
+      ]
+    },
+    "false_tt.rate.noise": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.7934567085261071
+      ]
+    },
+    "v1_interrupt.tor": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v1_interrupt.latency": {
+      "n": 2,
+      "median": 0.008312499999999723,
+      "p95": 0.01579374999999947,
+      "mean": 0.008312499999999723,
+      "min": 0.0,
+      "max": 0.016624999999999446,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v1_interrupt.rating": {
+      "n": 2,
+      "mean": 0.5
+    },
+    "v1_interrupt.t_stop": {
+      "n": 2,
+      "median": 0.7319999999999998,
+      "p95": 1.0775999999999997,
+      "mean": 0.7319999999999998,
+      "min": 0.34799999999999986,
+      "max": 1.1159999999999997,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v1_interrupt.not_played": 0,
+    "v15_interruption.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_interruption.resume": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v15_interruption.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_interruption.unknown": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_interruption.class.through": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v15_interruption.class.paused": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_interruption.class.stopped": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_interruption.t_stop": {
+      "n": 0,
+      "median": null,
+      "p95": null,
+      "mean": null,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": null
+    },
+    "v15_interruption.t_resp": {
+      "n": 2,
+      "median": 4.133,
+      "p95": 6.581899999999999,
+      "mean": 4.133,
+      "min": 1.4120000000000008,
+      "max": 6.853999999999999,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_interruption.judged": 2,
+    "v15_interruption.n": 2,
+    "v15_backchannel.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_backchannel.resume": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_backchannel.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_backchannel.unknown": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_backchannel.class.through": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v15_backchannel.class.paused": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_backchannel.class.stopped": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_backchannel.t_stop": {
+      "n": 0,
+      "median": null,
+      "p95": null,
+      "mean": null,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": null
+    },
+    "v15_backchannel.t_resp": {
+      "n": 1,
+      "median": 2.2950625000000002,
+      "p95": 2.2950625000000002,
+      "mean": 2.2950625000000002,
+      "min": 2.2950625000000002,
+      "max": 2.2950625000000002,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_backchannel.judged": 2,
+    "v15_backchannel.n": 2,
+    "v15_talking_to_other.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_talking_to_other.resume": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0,
+      "ci95": [
+        0.34237195288961925,
+        1.0
+      ]
+    },
+    "v15_talking_to_other.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_talking_to_other.unknown": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_talking_to_other.class.through": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_talking_to_other.class.paused": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_talking_to_other.class.stopped": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_talking_to_other.t_stop": {
+      "n": 2,
+      "median": 1.7590000000000003,
+      "p95": 2.1307000000000005,
+      "mean": 1.7590000000000003,
+      "min": 1.346,
+      "max": 2.1720000000000006,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_talking_to_other.t_resp": {
+      "n": 1,
+      "median": 0.6120000000000001,
+      "p95": 0.6120000000000001,
+      "mean": 0.6120000000000001,
+      "min": 0.6120000000000001,
+      "max": 0.6120000000000001,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_talking_to_other.judged": 2,
+    "v15_talking_to_other.n": 2,
+    "v15_background.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_background.resume": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_background.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_background.unknown": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_background.class.through": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    "v15_background.class.paused": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_background.class.stopped": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5,
+      "ci95": [
+        0.09452865480086614,
+        0.9054713451991339
+      ]
+    },
+    "v15_background.t_stop": {
+      "n": 2,
+      "median": 0.38300000000000034,
+      "p95": 0.38569999999999993,
+      "mean": 0.38300000000000034,
+      "min": 0.3800000000000008,
+      "max": 0.3859999999999999,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_background.t_resp": {
+      "n": 1,
+      "median": 3.3320000000000007,
+      "p95": 3.3320000000000007,
+      "mean": 3.3320000000000007,
+      "min": 3.3320000000000007,
+      "max": 3.3320000000000007,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_background.judged": 2,
+    "v15_background.n": 2,
+    "voice.basis": "all interruption clips with voice data",
+    "voice.wpm": {
+      "n": 2,
+      "mean_delta": 7.722809976908309,
+      "p": 0.6025568733531828,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.pitch_mean": {
+      "n": 2,
+      "mean_delta": -7.3136766156177515,
+      "p": 0.30655036525952106,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.pitch_sd": {
+      "n": 2,
+      "mean_delta": 3.526945475365153,
+      "p": 0.724117628035047,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.intensity_mean": {
+      "n": 2,
+      "mean_delta": -1.5067205203537046,
+      "p": 0.2267899086300568,
+      "significant": false,
+      "expected": "lower"
+    },
+    "voice.intensity_sd": {
+      "n": 2,
+      "mean_delta": 0.1634495318694893,
+      "p": 0.3063890003777081,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.utmosv2": {
+      "n": 0,
+      "mean_delta": null,
+      "p": null,
+      "significant": null,
+      "expected": "no drop"
+    }
+  }
+}

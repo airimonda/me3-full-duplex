@@ -1,0 +1,26 @@
+venv/
+__pycache__/
+*.pyc
+fd-benchmark/          # class harness clone; its .env holds keys
+Full-Duplex-Bench/
+vcm-me2/
+runs/
+graphify-out/
+*.wav
+*.aiff
+*.mp3
+*.npy                  # voice embeddings (biometric)
+chat.log
+chat_log.jsonl
+ui.log
+server.log
+kokoro_timing.json
+whisper_timing.json
+latency_log.json
+tts_out_*.wav
+.spotify_*
+spotify_auth.log
+.DS_Store
+sandbox/
+tasks/
+

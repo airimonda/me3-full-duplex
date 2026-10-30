@@ -1,0 +1,44 @@
+student,paper,metric,key,value,n,k,ci_low,ci_high,median,p95,mean,p_value,better
+me3,v1,"TOR, pause handling (synthetic)",v1_pause_synth.tor,0.0,2,0,0.0,0.6576280471103807,,,,,lower
+me3,v1,"TOR, pause handling (Candor)",v1_pause_candor.tor,1.0,2,2,0.34237195288961925,1.0,,,,,lower
+me3,v1,"TOR, turn-taking (Candor, col 6)",v1_turntaking.tor,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,higher
+me3,v1,Missed turn-taking rate,v1_turntaking.missed_rate,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,lower
+me3,v1,False turn-taking rate,false_tt.rate,0.25,4,1,0.045586062644636216,0.6993639475573634,,,,,lower
+me3,v1,False turn-taking rate · side talk,false_tt.rate.side_talk,1.0,1,1,0.20654329147389294,1.0,,,,,lower
+me3,v1,False turn-taking rate · TV / radio,false_tt.rate.tv_radio,0.0,1,0,0.0,0.7934567085261071,,,,,lower
+me3,v1,False turn-taking rate · background speech,false_tt.rate.background,0.0,1,0,0.0,0.7934567085261071,,,,,lower
+me3,v1,False turn-taking rate · noise,false_tt.rate.noise,0.0,1,0,0.0,0.7934567085261071,,,,,lower
+me3,v1,"Latency, turn-taking",v1_turntaking.latency,2.7220000000000635,1,,,,2.7220000000000635,2.7220000000000635,2.7220000000000635,,lower
+me3,v1,"TOR, interruption",v1_interrupt.tor,1.0,2,2,0.34237195288961925,1.0,,,,,higher
+me3,v1,"Judge score, interruption (0–5)",v1_interrupt.rating,0.5,2,,,,,,0.5,,higher
+me3,v1,"Latency, interruption",v1_interrupt.latency,0.008312499999999723,2,,,,0.008312499999999723,0.01579374999999947,0.008312499999999723,,lower
+me3,v1.5,interruption · Respond,v15_interruption.respond,0.0,2,0,0.0,0.6576280471103807,,,,,higher
+me3,v1.5,interruption · Resume,v15_interruption.resume,1.0,2,2,0.34237195288961925,1.0,,,,,lower
+me3,v1.5,interruption · Uncertain,v15_interruption.uncertain,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,interruption · Unknown,v15_interruption.unknown,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,interruption · stop latency,v15_interruption.t_stop,,0,,,,,,,,lower
+me3,v1.5,interruption · response latency,v15_interruption.t_resp,4.133,2,,,,4.133,6.581899999999999,4.133,,lower
+me3,v1.5,backchannel · Respond,v15_backchannel.respond,0.0,2,0,0.0,0.6576280471103807,,,,,lower
+me3,v1.5,backchannel · Resume,v15_backchannel.resume,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,higher
+me3,v1.5,backchannel · Uncertain,v15_backchannel.uncertain,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,backchannel · Unknown,v15_backchannel.unknown,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,
+me3,v1.5,backchannel · stop latency,v15_backchannel.t_stop,,0,,,,,,,,lower
+me3,v1.5,backchannel · response latency,v15_backchannel.t_resp,2.2950625000000002,1,,,,2.2950625000000002,2.2950625000000002,2.2950625000000002,,lower
+me3,v1.5,talking to others · Respond,v15_talking_to_other.respond,0.0,2,0,0.0,0.6576280471103807,,,,,lower
+me3,v1.5,talking to others · Resume,v15_talking_to_other.resume,1.0,2,2,0.34237195288961925,1.0,,,,,higher
+me3,v1.5,talking to others · Uncertain,v15_talking_to_other.uncertain,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,talking to others · Unknown,v15_talking_to_other.unknown,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,talking to others · stop latency,v15_talking_to_other.t_stop,1.7590000000000003,2,,,,1.7590000000000003,2.1307000000000005,1.7590000000000003,,lower
+me3,v1.5,talking to others · response latency,v15_talking_to_other.t_resp,0.6120000000000001,1,,,,0.6120000000000001,0.6120000000000001,0.6120000000000001,,lower
+me3,v1.5,background speech · Respond,v15_background.respond,0.0,2,0,0.0,0.6576280471103807,,,,,lower
+me3,v1.5,background speech · Resume,v15_background.resume,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,higher
+me3,v1.5,background speech · Uncertain,v15_background.uncertain,0.0,2,0,0.0,0.6576280471103807,,,,,
+me3,v1.5,background speech · Unknown,v15_background.unknown,0.5,2,1,0.09452865480086614,0.9054713451991339,,,,,
+me3,v1.5,background speech · stop latency,v15_background.t_stop,0.38300000000000034,2,,,,0.38300000000000034,0.38569999999999993,0.38300000000000034,,lower
+me3,v1.5,background speech · response latency,v15_background.t_resp,3.3320000000000007,1,,,,3.3320000000000007,3.3320000000000007,3.3320000000000007,,lower
+me3,v1.5 voice,Δ wpm,voice.wpm,7.722809976908309,2,,,,,,7.722809976908309,0.6025568733531828,higher
+me3,v1.5 voice,Δ pitch_mean,voice.pitch_mean,-7.3136766156177515,2,,,,,,-7.3136766156177515,0.30655036525952106,higher
+me3,v1.5 voice,Δ pitch_sd,voice.pitch_sd,3.526945475365153,2,,,,,,3.526945475365153,0.724117628035047,higher
+me3,v1.5 voice,Δ intensity_mean,voice.intensity_mean,-1.5067205203537046,2,,,,,,-1.5067205203537046,0.2267899086300568,lower
+me3,v1.5 voice,Δ intensity_sd,voice.intensity_sd,0.1634495318694893,2,,,,,,0.1634495318694893,0.3063890003777081,higher
+me3,v1.5 voice,Δ utmosv2,voice.utmosv2,,0,,,,,,,,no drop

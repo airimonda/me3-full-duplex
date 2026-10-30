@@ -1,0 +1,17 @@
+(version 1)
+; ME3 task sandbox: Hermes may do anything EXCEPT write outside the sandbox,
+; its own runtime (~/.hermes), and system temp dirs.
+(allow default)
+(deny file-write*)
+(allow file-write*
+  (subpath "~/sandbox")
+  (subpath "~/.hermes")
+  (subpath "~/.pi")
+  (subpath "/private/tmp")
+  (subpath "/tmp")
+  (subpath "/dev")
+  (regex #"^/private/var/folders")
+  (regex #"^/var/folders")
+  (subpath "~/Library/Caches"))
+(allow file-read-data (subpath "/dev"))
+(allow process-exec (subpath "/dev"))
