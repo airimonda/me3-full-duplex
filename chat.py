@@ -97,7 +97,7 @@ WHISPER_GHOSTS = {
 }
 MAX_UTT_S = 15
 HISTORY_MAX_TURNS = 12
-TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
+TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3")
 LOG_PATH = os.path.expanduser("~/me3/chat_log.jsonl")
 
 SYSTEM_PROMPT = (

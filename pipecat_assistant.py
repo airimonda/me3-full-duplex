@@ -35,7 +35,7 @@ from pipecat.processors.frame_processor import FrameProcessor
 ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = "http://127.0.0.1:8300"
-TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "openai/gpt-4o-mini")
+TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
