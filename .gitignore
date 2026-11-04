@@ -24,3 +24,4 @@ spotify_auth.log
 sandbox/
 tasks/
 
+fd-benchmark/

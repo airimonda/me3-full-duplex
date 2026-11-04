@@ -34,7 +34,7 @@ from pipecat.processors.frame_processor import FrameProcessor
 
 ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
-SERVER = "http://127.0.0.1:8300"
+SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
 TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
@@ -66,24 +66,22 @@ _PROMPT_BASE = (
 _PROMPT_GATE = (
     " ADDRESSED-SPEECH GATE (most important rule): you hear everything in the room, "
     "including TV, radio and other people's conversations. Reply with exactly the single "
-    "word SILENT and nothing else when the transcript is NOT a request or question "
-    "directed at you. SILENT cases: TV or radio content; a line that starts with someone "
-    "else's name and a comma ('Gianna, this coffee is legit amazing' -> SILENT; 'Officer, "
-    "is this the right form to fill' -> SILENT); a side conversation between other people "
-    "('Rita, pass the soy sauce' -> SILENT); a sentence fragment that is not a request or "
-    "question ('sushi tonight your call' -> SILENT); talk about you in the third person; "
-    "a personal monologue or story told to no one ('so I'm probably gonna go over to my "
-    "boyfriend's place tomorrow night, I don't know' -> SILENT; 'I've started learning "
-    "guitar, I practice every day, the chords still feel tricky' -> SILENT). "
-    "ANSWER cases: direct questions and commands to you ('What time is it' -> ANSWER; "
-    "'Remind me to call the dentist' -> ANSWER; 'How long should I steep green tea' -> "
-    "ANSWER). Real requests directed at you are ALWAYS answered. Greetings and direct "
-    "social remarks to you ('Nice to meet you' -> ANSWER; 'See you later' -> ANSWER; "
-    "'That's great, thanks' -> ANSWER) are ANSWERED. BUT a first-person narration of "
-    "the speaker's own life ('I'm bored with my exercise routine' -> SILENT; 'I've "
-    "started learning guitar' -> SILENT) is a personal monologue, not a request — "
-    "SILENT even if it sounds like something you could respond to. Only speech that "
-    "asks you something or clearly addresses you gets an answer."
+    "word SILENT and nothing else ONLY when you have positive evidence the speech is "
+    "not directed at you. SILENT ONLY for: TV or radio content; a line addressed to "
+    "someone else by name ('Gianna, this coffee is legit amazing' -> SILENT; 'Officer, "
+    "is this the right form to fill' -> SILENT; 'Rita, pass the soy sauce' -> SILENT); "
+    "clear two-person side talk where one person tells another to do something; talk "
+    "about you in the third person; phone calls or dictation not meant for the room. "
+    "DEFAULT TO ANSWER: when one person speaks in a natural one-on-one cadence — a "
+    "direct question, a request, a command, a greeting, a direct social remark, or a "
+    "statement or story told as if to a listener — treat it as ADDRESSED TO YOU even "
+    "without a wake word or name. ('What time is it' -> ANSWER; 'How long should I "
+    "steep green tea' -> ANSWER; 'Remind me to call the dentist' -> ANSWER; 'I'm bored "
+    "with my exercise routine' -> ANSWER; 'I've been thinking about changing my career "
+    "path' -> ANSWER; 'Nice to meet you' -> ANSWER). A solo speaker sharing a thought "
+    "or story with a listener is still addressed to you — do NOT call it a monologue "
+    "and do NOT say SILENT for it. When unsure between ANSWER and SILENT, choose "
+    "ANSWER."
 )
 # mic mode: voice enrollment already rejects strangers/TV, so the SILENT gate
 # is redundant there and kept eating real commands ("build me a Mario game").
@@ -108,6 +106,17 @@ def _token_set(s):
 
 _IN_SR = 16000
 _OUT_SR = 24000
+# USB PnP mics only accept 48k directly via PortAudio; capture at 48k and
+# downsample to 16k before VAD/ASR (no-op when the mic supports 16k).
+_MIC_SR = int(os.environ.get("ME3_MIC_SR", "48000"))
+
+
+def _to_in_sr(samples: np.ndarray) -> np.ndarray:
+    if _MIC_SR == _IN_SR:
+        return samples
+    n = len(samples) * _IN_SR // _MIC_SR
+    return np.interp(np.linspace(0, len(samples) - 1, n, endpoint=False),
+                     np.arange(len(samples)), samples).astype(np.int16)
 _ENDPOINT_MS = 600
 _MIN_UTT_MS = 250
 _BARGE_MS = 150
@@ -177,7 +186,8 @@ class WatsonAgent(FrameProcessor):
         self.respond_task = None   # in-flight _respond coroutine (for supersede)
         self.key = _openrouter_key()
         self.dgx_key = _dgx3_key()
-        self.http = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=180,
+        self._bad_logged = 0
+        self.http = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=20,
                                                             write=30, pool=10))
         self.gen = 0  # generation counter: invalidate stale playback after barge-in
         self.resume_pcm = None   # unplayed remainder of an interrupted reply (raw PCM)
@@ -214,8 +224,8 @@ class WatsonAgent(FrameProcessor):
         await super().process_frame(frame, direction)
         from pipecat.frames.frames import InputAudioRawFrame
         from pipecat.processors.frame_processor import FrameDirection
-        if isinstance(frame, InputAudioRawFrame) and frame.sample_rate == _IN_SR:
-            await self._on_audio(np.frombuffer(frame.audio, dtype=np.int16))
+        if isinstance(frame, InputAudioRawFrame) and frame.sample_rate == _MIC_SR:
+            await self._on_audio(_to_in_sr(np.frombuffer(frame.audio, dtype=np.int16)))
         else:
             await self.push_frame(frame, direction)
 
@@ -262,7 +272,7 @@ class WatsonAgent(FrameProcessor):
                 self.probing = True
                 self.probe_ms = 0.0
                 self.probe_rms_peak = rms
-                self.probe_pcm = pcm  # start the probe buffer with this frame
+                self.probe_pcm = bytearray(pcm)  # start the probe buffer with this frame
             else:
                 if state == VADState.QUIET:
                     self.ambient_rms = 0.9 * self.ambient_rms + 0.1 * rms
@@ -319,7 +329,14 @@ class WatsonAgent(FrameProcessor):
                    "I'll come back to this one as soon as a slot frees up.")
             self.log_event("delegate_busy", task=rest[:80])
         else:
-            tid = await asyncio.to_thread(self.taskmgr.submit_task, rest)
+            try:
+                tid = await asyncio.to_thread(self.taskmgr.submit_task, rest)
+            except Exception as e:
+                # task backend unavailable (e.g. no sandbox-exec on the Pi):
+                # never crash the turn — acknowledge honestly instead
+                self.log_event("delegate_failed", err=repr(e)[:120],
+                               task=rest[:80])
+                tid = None
             if tid:
                 ack = ("Handing that to my agent now. I'll let you know "
                        "when it's done.")
@@ -372,8 +389,8 @@ class WatsonAgent(FrameProcessor):
         # speaker gate: same voice profile the live loop uses.
         # Normalize first — the raw mic level here is low and embed()'s
         # silence-trim would otherwise discard the whole utterance.
-        no_gate = low.startswith("watson")
-        if no_gate and len(low) > 6:
+        no_gate = self.mode == "bench" or low.startswith("watson")
+        if no_gate and low.startswith("watson") and len(low) > 6:
             text = text.strip()[7:].strip(" ,.!?") or text.strip()
         norm = np.frombuffer(utt_pcm, dtype=np.int16).astype(np.float32)
         norm /= (np.abs(norm).max() + 1e-9)
@@ -384,6 +401,9 @@ class WatsonAgent(FrameProcessor):
             fragment = len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text)
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
+                # mic mode: a fragment ("we", "okay") must not spawn a response —
+                # it would supersede the in-flight reply and kill it
+                return
             elif self.speaker is not None:
                 sim = self.spk.similarity(norm, self.speaker)
                 if sim < 0.0:
@@ -393,14 +413,18 @@ class WatsonAgent(FrameProcessor):
                     self.log_event("stranger_ignored", user=text, sim=round(sim, 3))
                     return
                 elif sim < self.spk.threshold():
-                    # near-miss: accept and refresh the profile (self-healing)
-                    emb = self.spk.embed(norm)
-                    if emb is not None and self.spk.voiced_seconds(norm) >= 1.0:
-                        self.spk.save_profile(emb)
-                        self.log_event("voice_refreshed", sim=round(sim, 3))
-            elif len(utt_pcm) > _IN_SR * 2:  # no profile yet: enroll from this utterance
+                    # near-miss: accept, but only refresh the profile from
+                    # wake-prefixed commands (definitely the owner speaking)
+                    if no_gate:
+                        emb = self.spk.embed(norm)
+                        if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
+                            self.spk.save_profile(emb)
+                            self.log_event("voice_refreshed", sim=round(sim, 3))
+            elif (low.startswith("watson") and len(utt_pcm) > _IN_SR * 2):
+                # no profile yet: enroll ONLY a wake-prefixed speaker, so a
+                # stranger (or the TV) can never claim the profile by talking
                 emb = self.spk.embed(norm)
-                if emb is not None and self.spk.voiced_seconds(norm) >= 1.0:
+                if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
                     self.spk.save_profile(emb)
                     self.speaker = emb
                     self.log_event("enrolled")
@@ -457,6 +481,9 @@ class WatsonAgent(FrameProcessor):
             stream = await self.http.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}"}, json=body)
+            self.log_event("llm_http", status=stream.status_code,
+                           model=TALKER_MODEL, n_msgs=len(msgs),
+                           n_tools=len(body.get("tools", [])))
             async for line in stream.aiter_lines():
                 if self.gen != gen:
                     return calls
@@ -468,6 +495,9 @@ class WatsonAgent(FrameProcessor):
                 try:
                     d = json.loads(data)["choices"][0]["delta"]
                 except Exception:
+                    if "error" in data or self._bad_logged < 3:
+                        self.log_event("llm_bad_line", line=data[:200])
+                        self._bad_logged += 1
                     continue
                 for tc in d.get("tool_calls") or []:
                     i = tc.get("index", 0)
@@ -525,7 +555,20 @@ class WatsonAgent(FrameProcessor):
             return calls
 
         try:
-            calls = await one_pass(self.history, True)
+            calls = None
+            for attempt in (1, 2):
+                try:
+                    calls = await one_pass(self.history, True)
+                except Exception as e:
+                    self.log_event("llm_stream_error", attempt=attempt,
+                                   err=repr(e)[:120])
+                    calls = None
+                    if attempt == 2:
+                        raise
+                if (reply or calls or first_audio is not None
+                        or self.gen != gen):
+                    break  # got something (or superseded): don't retry
+                self.log_event("llm_empty_retry", attempt=attempt, user=text)
             if calls and self.gen == gen:
                 self.history.append({"role": "assistant", "content": None, "tool_calls": [
                     {"id": s["id"], "type": "function",
@@ -681,7 +724,7 @@ async def build(transport, log_dir: Path):
 
     worker = PipelineWorker(
         Pipeline([transport.input(), agent, transport.output()]),
-        params=PipelineParams(audio_in_sample_rate=_IN_SR, audio_out_sample_rate=_OUT_SR),
+        params=PipelineParams(audio_in_sample_rate=_MIC_SR, audio_out_sample_rate=_OUT_SR),
         enable_tracing=False,
         cancel_on_idle_timeout=False,  # quiet stretches between trials must not kill us
     )
@@ -801,11 +844,20 @@ class MicTransport:
 
 async def mic_main():
     os.environ["ME3_MODE"] = "mic"   # voice gate on, SILENT gate off
+    # mic mode runs without the benchmark launcher, so load the project .env
+    # (OPENROUTER_API_KEY, ME3_SERVER, ...) — without it the talker gets a
+    # None key and every reply is a silent 401.
+    env_file = ME3 / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"'))
     from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
     log_dir = Path.home() / "me3" / "runs" / "live"
     transport = LocalAudioTransport(LocalAudioTransportParams(
         audio_in_enabled=True, audio_out_enabled=True,
-        audio_in_sample_rate=_IN_SR, audio_out_sample_rate=_OUT_SR,
+        audio_in_sample_rate=_MIC_SR, audio_out_sample_rate=_OUT_SR,
         audio_in_channels=1, audio_out_channels=1))
     run_coro, cancel = await build(transport, log_dir)
     try:
