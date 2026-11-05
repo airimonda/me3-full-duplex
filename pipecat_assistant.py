@@ -119,8 +119,60 @@ WHISPER_GHOSTS = {
     "hello", "hi", "hey", "you", "so", "and", "the", "a", "i", "it",
     "mmhmm", "amen", "and you", "you know", "i know", "my pleasure",
     "go to see you in the next video", "see you in the next video",
-    "wharton", "watch on", "button",
 }
+
+# ---- wake word (high recall) ----------------------------------------------
+# Whisper mishears "Watson" a lot (Oct 30 live log: 6 of ~20 bare wakes came
+# out as "button", "Watch on.", "What's on?"). The old exact
+# startswith("watson") check dropped those silently. Match the first one or
+# two tokens (after an optional "hey"/"ok") against known mishearings, then
+# fall back to a fuzzy ratio. Recall over precision: a false wake only costs
+# a greeting or keeps the owner's voice gate in charge.
+_WAKE_WORDS = {
+    "watson", "watsons", "wattson", "watsun", "whatson", "watsen", "waston",
+    "wattsun", "watsom", "wharton", "walton", "button", "orton",
+    "batson", "matson", "watton", "wasson", "watts",
+}
+_WAKE_PAIRS = {
+    ("watch", "on"), ("what's", "on"), ("whats", "on"), ("what", "son"),
+    ("what", "sun"), ("watts", "on"), ("watt", "son"), ("wat", "son"),
+    ("watch", "son"), ("wash", "on"),
+}
+_WAKE_LEAD = {"hey", "hi", "ok", "okay", "yo", "hello", "oh", "um", "uh", "ah"}
+_WAKE_FUZZ = 0.8
+_WAKE_TOK = re.compile(r"[a-z0-9']+")
+
+
+def _wake_fuzzy(word: str) -> bool:
+    import difflib
+    w = word.replace("'", "")
+    return (4 <= len(w) <= 9
+            and difflib.SequenceMatcher(None, w, "watson").ratio() >= _WAKE_FUZZ)
+
+
+def wake_split(text: str) -> tuple[bool, str]:
+    """(is_wake, remainder). True when the utterance OPENS with the wake word
+    or a known mishearing of it; remainder is the original text after it."""
+    toks = [(m.group(), m.end()) for m in _WAKE_TOK.finditer(text.lower())]
+    starts = [0, 1] if toks and toks[0][0] in _WAKE_LEAD else [0]
+    # order matters: exact pair ("watts on") > single word ("watson is" must
+    # not consume "is") > fuzzy pair ("what sin")
+    for i in starts:
+        if i >= len(toks):
+            continue
+        pair = (toks[i][0], toks[i + 1][0]) if i + 1 < len(toks) else None
+        if pair in _WAKE_PAIRS:
+            return True, text[toks[i + 1][1]:].lstrip(" ,.!?;:-").strip()
+        if toks[i][0] in _WAKE_WORDS or _wake_fuzzy(toks[i][0]):
+            return True, text[toks[i][1]:].lstrip(" ,.!?;:-").strip()
+        if pair and _wake_fuzzy(pair[0] + pair[1]):
+            return True, text[toks[i + 1][1]:].lstrip(" ,.!?;:-").strip()
+    return False, text.strip()
+
+
+# mic mode: after this long with no accepted turn and no playback, Watson
+# goes idle and answers only wake-prefixed speech until woken again
+_IDLE_S = float(os.environ.get("ME3_IDLE_S", "300"))
 
 def _voiced_db(pcm16: bytes) -> float:
     """Median RMS (dBFS) of the voiced 30 ms frames (>10% of the loudest)."""
@@ -291,6 +343,8 @@ class WatsonAgent(FrameProcessor):
         self.spoken_tokens = set()      # words of the reply being spoken (echo filter)
         self.last_task_check = 0.0
         self.announce_task = None
+        # idle state (mic mode): last accepted turn / playback / wake word
+        self.last_active = time.monotonic()
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
@@ -664,7 +718,8 @@ class WatsonAgent(FrameProcessor):
         # ghost filter: Whisper's classic hallucinations on short bursts / TV
         # audio — drop before they count as speech or touch the voice profile
         norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
-        no_wake = not norm.startswith("watson")
+        is_wake, wake_rest = wake_split(text)
+        no_wake = not is_wake
         # bare stop after a keyword barge ("stop", "Watson, wait"): the
         # interruption itself was the request — stay quiet, drop the remainder
         if (self.barged and _token_set(text)
@@ -694,10 +749,19 @@ class WatsonAgent(FrameProcessor):
         if no_wake and _token_set(text) <= FILLERS:
             self.log_event("filler_ignored", user=text)
             return
+        # idle (mic mode): 5 min with no accepted turn and no playback ->
+        # answer only wake-prefixed speech. Bench clips never say "Watson".
+        idle_s = time.monotonic() - self.last_active
+        if self.mode == "mic" and idle_s > _IDLE_S:
+            if no_wake:
+                self.log_event("ignored_idle", user=text, idle_s=round(idle_s))
+                return
+            self.log_event("woke", user=text, idle_s=round(idle_s))
+        if is_wake:
+            self.last_active = time.monotonic()
         # wake-word handling: bare "Watson" -> greet; "Watson, ..." -> strip the
         # wake word and ALWAYS answer (never let the SILENT gate eat a command)
-        low = text.strip().lower().strip(".,!? ")
-        if low in ("watson", "watson?"):
+        if is_wake and not (_token_set(wake_rest) - FILLERS):
             wav = await self._speak("Yes? I'm listening.")
             if wav:
                 self.playing = True
@@ -712,15 +776,18 @@ class WatsonAgent(FrameProcessor):
         # here: it disables bench's SILENT gate (SILENT then gets spoken and
         # overheard-speech resume never runs). The voice gate below is
         # already mic-only.
-        no_gate = low.startswith("watson")
-        if no_gate and low.startswith("watson") and len(low) > 6:
-            text = text.strip()[7:].strip(" ,.!?") or text.strip()
+        no_gate = is_wake
+        heard = text.strip()
+        if is_wake:
+            text = wake_rest or heard
         norm = np.frombuffer(utt_pcm, dtype=np.int16).astype(np.float32)
         norm /= (np.abs(norm).max() + 1e-9)
         if self.mode == "mic":
             # fragments/gibberish embed unreliably — don't voice-gate them (the
             # SILENT gate handles them); only gate real sentences
-            words = text.strip().split()
+            # wake-prefixed: count the whole utterance ("Watson, lights off"
+            # is addressed and long enough to embed, not a fragment)
+            words = (heard if is_wake else text).split()
             fragment = len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text)
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
@@ -743,7 +810,7 @@ class WatsonAgent(FrameProcessor):
                         if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
                             self.spk.save_profile(emb)
                             self.log_event("voice_refreshed", sim=round(sim, 3))
-            elif (low.startswith("watson") and len(utt_pcm) > _IN_SR * 2):
+            elif (is_wake and len(utt_pcm) > _IN_SR * 2):
                 # no profile yet: enroll ONLY a wake-prefixed speaker, so a
                 # stranger (or the TV) can never claim the profile by talking
                 emb = self.spk.embed(norm)
@@ -752,6 +819,7 @@ class WatsonAgent(FrameProcessor):
                     self.speaker = emb
                     self.log_event("enrolled")
         # bench mode: no voice gate — benchmark clips are not enrolled speakers
+        self.last_active = time.monotonic()   # accepted turn: stay awake
         # a NEW accepted utterance supersedes an in-flight reply (fragments and
         # ghosts never got here — they can't kill the real reply)
         prev = self.respond_task
@@ -1054,6 +1122,7 @@ class WatsonAgent(FrameProcessor):
             ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
             self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
+            self.last_active = time.monotonic()   # speaking = activity (idle timer)
             n_seg += 1
             if n_seg > prebuffer:
                 await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
