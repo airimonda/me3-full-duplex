@@ -273,7 +273,7 @@ class WatsonAgent(FrameProcessor):
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
-        import chat as chatbrain      # QUICK_TOOLS + execute_tool (single source of truth)
+        import brain as chatbrain     # SYSTEM_PROMPT + QUICK_TOOLS + execute_tool
         import tasks as taskmgr       # sandboxed Hermes delegation
         self.chatbrain = chatbrain
         self.taskmgr = taskmgr
