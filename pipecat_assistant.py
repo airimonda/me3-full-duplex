@@ -92,6 +92,14 @@ SYSTEM_PROMPT_MIC = _PROMPT_BASE
 # filler-only utterances and Whisper's classic hallucinations on short quiet
 # bursts / TV audio (ported from chat.py)
 FILLERS = {"um", "uh", "mhm", "hmm", "uh-huh", "huh", "mm", "yeah", "okay", "ok"}
+# backchannel vocabulary: an interrupting utterance made ONLY of these is
+# agreement/noise, not a request — resume the interrupted reply instead of
+# answering it. Subset + length caps keep real commands safe.
+BACKCHANNEL_TOKENS = FILLERS | {
+    "true", "right", "nice", "cool", "wow", "really", "exactly", "sure",
+    "oh", "yes", "alright", "totally", "good", "great", "same", "i", "know",
+    "that's", "that", "is", "so", "and", "all", "it's", "it", "think",
+}
 WHISPER_GHOSTS = {
     "thank you", "thank you very much", "thanks", "thanks for watching",
     "thanks for watching my video", "see you next time",
@@ -369,6 +377,20 @@ class WatsonAgent(FrameProcessor):
         # audio — drop before they count as speech or touch the voice profile
         norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
         no_wake = not norm.startswith("watson")
+        # backchannel resume: a barge committed, but the interrupting
+        # utterance is pure backchannel ("yeah", "true", "uh-huh") — not a
+        # request. Resume the reply we were interrupted in; never answer it.
+        # (checked BEFORE the ghost filter so an "I know" also resumes)
+        if (no_wake and self.barged and self.resume_pcm
+                and len(_token_set(text)) <= 6
+                and _token_set(text) <= BACKCHANNEL_TOKENS):
+            pcm, self.resume_pcm = self.resume_pcm, None
+            self.barged = False
+            self.playing = True
+            self.log_event("backchannel_resume", user=text)
+            await self._play_pcm(pcm, self.gen)
+            self.playing = False
+            return
         if no_wake and norm in WHISPER_GHOSTS:
             self.log_event("ghost_ignored", user=text)
             return
