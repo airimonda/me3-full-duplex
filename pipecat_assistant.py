@@ -36,6 +36,8 @@ ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
 TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
+# answers when the talker streams empty twice in a row ("" disables)
+FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
@@ -118,11 +120,22 @@ WHISPER_GHOSTS = {
     "wharton", "watch on", "button",
 }
 
+def _voiced_db(pcm16: bytes) -> float:
+    """Median RMS (dBFS) of the voiced 30 ms frames (>10% of the loudest)."""
+    a = np.frombuffer(pcm16, dtype=np.int16).astype(np.float32) / 32768.0
+    n = int(_IN_SR * 0.03)
+    if len(a) < n:
+        return -120.0
+    r = np.sqrt((a[:len(a) // n * n].reshape(-1, n) ** 2).mean(1)) + 1e-9
+    return float(20 * np.log10(np.median(r[r > r.max() * 0.1])))
+
+
 def _token_set(s):
     return set(re.findall(r"[a-z0-9']+", s.lower()))
 
 _IN_SR = 16000
 _TALKER_TEMP = float(os.environ.get("ME3_TALKER_TEMP", "0"))
+_MIN_VOICED_DB = float(os.environ.get("ME3_MIN_VOICED_DB", "-30"))
 _HIST_KEEP = int(os.environ.get("ME3_HIST_KEEP", "12"))  # messages kept besides system
 _OUT_SR = 24000
 # USB PnP mics only accept 48k directly via PortAudio; capture at 48k and
@@ -388,12 +401,20 @@ class WatsonAgent(FrameProcessor):
         if peak < 0.10:
             self.log_event("ignored_quiet", peak=round(peak, 3))
             return
+        # faint-speech gate (bench only; mic mode has the voice-ID gate):
+        # background speech peaks above the 0.10 gate but its typical voiced
+        # level is -31..-36 dBFS vs -12..-28 for addressed turns (dataset scan)
+        lvl_db = _voiced_db(utt_pcm)
+        if self.mode == "bench" and lvl_db < _MIN_VOICED_DB:
+            self.log_event("ignored_faint", lvl_db=round(lvl_db, 1))
+            return
         from pipecat.frames.frames import OutputAudioRawFrame
         text = await self._asr(utt_pcm)
         t_asr = time.perf_counter()
         if not text or len(text.strip()) < 2:
             return
-        self.log_event("asr", text=text, asr_s=round(t_asr - t0, 3))
+        self.log_event("asr", text=text, asr_s=round(t_asr - t0, 3),
+                       lvl_db=round(lvl_db, 1))
         # ghost filter: Whisper's classic hallucinations on short bursts / TV
         # audio — drop before they count as speech or touch the voice profile
         norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
@@ -524,13 +545,13 @@ class WatsonAgent(FrameProcessor):
         max_words = 35 if self.mode == "bench" else 400
         first_token = None
 
-        async def one_pass(msgs, use_tools):
+        async def one_pass(msgs, use_tools, model=TALKER_MODEL):
             """One streaming LLM pass. Accumulates tool calls; emits TTS
             sentence-by-sentence; returns the tool calls (if any)."""
             nonlocal first_token, first_audio, reply, delegate_rest
             calls = {}
             buf = ""
-            body = {"model": TALKER_MODEL, "messages": msgs, "stream": True,
+            body = {"model": model, "messages": msgs, "stream": True,
                     "max_tokens": 400,
                     # deterministic gate: at the provider default temperature the
                     # SILENT/ANSWER call flipped run to run on identical audio
@@ -541,7 +562,7 @@ class WatsonAgent(FrameProcessor):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}"}, json=body)
             self.log_event("llm_http", status=stream.status_code,
-                           model=TALKER_MODEL, n_msgs=len(msgs),
+                           model=model, n_msgs=len(msgs),
                            n_tools=len(body.get("tools", [])))
             async for line in stream.aiter_lines():
                 if self.gen != gen:
@@ -615,14 +636,22 @@ class WatsonAgent(FrameProcessor):
 
         try:
             calls = None
-            for attempt in (1, 2):
+            # two tries on the talker, then one on the fallback model:
+            # glm-5.3-flash sometimes streams an empty reply twice in a row
+            # (bench 13-22-28: turn-taking miss), the fallback answers instead
+            tries = [TALKER_MODEL, TALKER_MODEL]
+            if FALLBACK_MODEL and FALLBACK_MODEL != TALKER_MODEL:
+                tries.append(FALLBACK_MODEL)
+            for attempt, model in enumerate(tries, 1):
+                if model != TALKER_MODEL:
+                    self.log_event("llm_fallback", model=model, user=text)
                 try:
-                    calls = await one_pass(self.history, True)
+                    calls = await one_pass(self.history, True, model)
                 except Exception as e:
                     self.log_event("llm_stream_error", attempt=attempt,
-                                   err=repr(e)[:120])
+                                   model=model, err=repr(e)[:120])
                     calls = None
-                    if attempt == 2:
+                    if attempt == len(tries):
                         raise
                 if (reply or calls or first_audio is not None
                         or self.gen != gen):
