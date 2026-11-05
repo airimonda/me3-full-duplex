@@ -132,6 +132,17 @@ def _voiced_db(pcm16: bytes) -> float:
     return float(20 * np.log10(np.median(r[r > r.max() * 0.1])))
 
 
+# mic-mode barge-in by keyword: while Watson talks, the last _KW_WINDOW_S of
+# mic audio is transcribed and Watson stops only on one of these words.
+# Speaker-ID and waveform checks cannot separate the owner from Watson's own
+# louder echo on the Pi's open speaker (Nov 5 live tests).
+_BARGE_MODE = os.environ.get("ME3_BARGE_MODE", "keyword")   # keyword | voice
+_KW_WINDOW_S = 1.6
+_KW_EVERY_MS = 300           # min new audio between two keyword checks
+_STOP_WORDS = {"stop", "wait", "hold", "pause", "enough", "quiet", "shush"}
+_WAKE_FORMS = {"watson", "watsons", "wattson", "watsun", "whatson"}
+_STOP_ONLY = _STOP_WORDS | _WAKE_FORMS | {"please", "ok", "okay", "on", "it",
+                                           "there", "now", "right", "hey", "a", "second", "minute"}
 _ECHO_HIST_S = 3.0        # played audio kept as echo reference (16 kHz)
 _ECHO_CORR = 0.50         # xcorr at/above this = our own voice (duplex.py value)
 _ECHO_OVER = 1.6          # bursts must exceed the learned echo level by this
@@ -274,6 +285,10 @@ class WatsonAgent(FrameProcessor):
         self.echo_checked_ms = 0.0
         self.echo_best = 0.0
         self.last_verdict = None
+        self.play_mic = bytearray()     # last _KW_WINDOW_S of mic audio while playing
+        self.kw_task = None
+        self.kw_checked_ms = 0.0
+        self.spoken_tokens = set()      # words of the reply being spoken (echo filter)
         self.last_task_check = 0.0
         self.announce_task = None
         # speaker enrollment: same profile file as the live loop (chat.py)
@@ -324,6 +339,36 @@ class WatsonAgent(FrameProcessor):
                                       if self.speaker is not None else None))
         except Exception as e:
             self.log_event("watson_voice_error", err=repr(e)[:120])
+
+    async def _prompt_after_stop(self, gen: int):
+        """After 'Watson'/'wait' stopped a reply: if the owner has not kept
+        talking within ~1 s, say "Go ahead" so they repeat the request on a
+        clean (echo-free) mic."""
+        await asyncio.sleep(1.0)
+        if self.gen != gen or self.in_speech or self.playing:
+            return
+        self.log_event("prompt_after_stop")
+        try:
+            r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
+            wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
+        except Exception:
+            wav = await self._speak("Go ahead.")
+        if wav and self.gen == gen and not self.in_speech:
+            self.playing = True
+            await self._play_pcm(_wav_pcm(wav), gen)
+            self.playing = False
+
+    async def _keyword_check(self, pcm: bytes):
+        """(hit, transcript): a stop word or "Watson" that Watson is not
+        itself saying in the current reply. Fails closed (no stop) on error."""
+        try:
+            heard = await self._asr(pcm)
+        except Exception as e:
+            self.log_event("kw_asr_error", err=repr(e)[:120])
+            return False, ""
+        toks = _token_set(heard)
+        hits = (toks & (_STOP_WORDS | _WAKE_FORMS)) - self.spoken_tokens
+        return bool(hits), heard
 
     async def _voice_verdict(self, pcm: bytes):
         """(is_echo, sim_watson, sim_owner) for a barge probe. Fails open:
@@ -379,6 +424,10 @@ class WatsonAgent(FrameProcessor):
         floor = max(0.018, self.ambient_rms * 2.0)
 
         if self.playing:
+            self.play_mic.extend(pcm)
+            keep = int(_KW_WINDOW_S * _IN_SR) * 2
+            if len(self.play_mic) > keep:
+                del self.play_mic[:len(self.play_mic) - keep]
             # probes do NOT pause playback — audio keeps flowing; only a
             # confirmed (non-echo, sustained) interruption stops it
             if self.probing:
@@ -408,6 +457,36 @@ class WatsonAgent(FrameProcessor):
                     self.probe_pcm = bytearray()
                     self.log_event("probe_resume", probe_ms=round(self.probe_ms, 1),
                                    echo_best=round(self.echo_best, 3))
+                elif (self.probe_ms >= 600 and self.mode == "mic"
+                        and _BARGE_MODE == "keyword"):
+                    # mic mode: stop only on a spoken stop word / "Watson".
+                    # Playback keeps running while Whisper checks (no pause).
+                    if self.kw_task is None:
+                        if self.probe_ms - self.kw_checked_ms >= _KW_EVERY_MS:
+                            self.kw_checked_ms = self.probe_ms
+                            self.kw_task = asyncio.create_task(
+                                self._keyword_check(bytes(self.play_mic)))
+                    elif self.kw_task.done():
+                        hit, heard = self.kw_task.result()
+                        self.kw_task = None
+                        self.last_verdict = {"heard": heard}
+                        if hit:
+                            # the window is mostly Watson's own echo: ASR of it
+                            # returns Watson's words and the voice gate drops
+                            # it (Nov 5 test). Discard it and listen fresh.
+                            self.probe_pcm = bytearray()
+                            self.probe_ms = 0.0
+                            await self._commit_barge()
+                            self.in_speech = False
+                            self.speech_ms = 0.0
+                            toks = _token_set(heard)
+                            if toks & (_WAKE_FORMS | {"wait", "hold"}):
+                                asyncio.create_task(self._prompt_after_stop(self.gen))
+                            else:
+                                self.log_event("stopped_by_user", heard=heard[:80])
+                        else:
+                            self.log_event("echo_ignored", by="keyword", heard=heard[:80],
+                                           rms=round(self.probe_rms_peak, 3))
                 elif self.probe_ms >= 600:
                     # mic mode: before stopping, check WHO is speaking —
                     # Watson's own echo sounds like Watson, not the owner.
@@ -421,6 +500,7 @@ class WatsonAgent(FrameProcessor):
                             is_echo, sw, so = self.verify_task.result()
                             self.verify_task = None
                             self.last_verdict = {"sim_watson": sw, "sim_owner": so}
+                            self._dump_verdict(is_echo, sw, so)
                             if is_echo:
                                 self.probing = False
                                 self.probe_pcm = bytearray()
@@ -442,6 +522,8 @@ class WatsonAgent(FrameProcessor):
                 self.echo_best = 0.0
                 self.verify_task = None
                 self.last_verdict = None
+                self.kw_task = None
+                self.kw_checked_ms = 0.0
                 self.probe_rms_peak = rms
                 self.probe_pcm = bytearray(pcm)  # start the probe buffer with this frame
             else:
@@ -450,6 +532,10 @@ class WatsonAgent(FrameProcessor):
                 self.barge_ms = max(0.0, self.barge_ms - ms)
             return
 
+        # not playing: the keyword window must never carry the previous
+        # command into the next reply
+        if self.play_mic:
+            self.play_mic = bytearray()
         if state != VADState.QUIET:
             self.buf.extend(pcm)
             self.in_speech = True
@@ -579,6 +665,15 @@ class WatsonAgent(FrameProcessor):
         # audio — drop before they count as speech or touch the voice profile
         norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
         no_wake = not norm.startswith("watson")
+        # bare stop after a keyword barge ("stop", "Watson, wait"): the
+        # interruption itself was the request — stay quiet, drop the remainder
+        if (self.barged and _token_set(text)
+                and _token_set(text) <= _STOP_ONLY
+                and _token_set(text) & (_STOP_WORDS | _WAKE_FORMS)):
+            self.barged = False
+            self.resume_pcm = None
+            self.log_event("stopped_by_user", user=text)
+            return
         # backchannel resume: a barge committed, but the interrupting
         # utterance is pure backchannel ("yeah", "true", "uh-huh") — not a
         # request. Resume the reply we were interrupted in; never answer it.
@@ -686,6 +781,7 @@ class WatsonAgent(FrameProcessor):
                                first_audio_s=round(t_asr - t0, 3),
                                total_s=round(time.perf_counter() - t0, 3))
                 return
+        self.spoken_tokens = set()   # new reply: only its own words are echo
         self.history.append({"role": "user", "content": text})
         # cap context: talker first-token grows with history (glm-5.3-flash:
         # 1.1-2.0 s at 2 msgs vs 2.0-3.7 s at 54; bench spikes hit 7-10 s and
@@ -895,6 +991,7 @@ class WatsonAgent(FrameProcessor):
             if r.status_code != 200:
                 return None
             return r.content
+        self.spoken_tokens |= _token_set(text)
         r = await self.http.post(f"{SERVER}/speak",
                                  json={"text": text, "voice": TTS_VOICE})
         if r.status_code != 200:
@@ -903,6 +1000,21 @@ class WatsonAgent(FrameProcessor):
 
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
+
+    def _dump_verdict(self, is_echo, sw, so):
+        """Mic mode: save every voice verdict's probe audio (echo or owner)
+        to runs/live/verdicts/<t>_<echo|owner>.npz for threshold tuning."""
+        if self.mode != "mic":
+            return
+        try:
+            d = self.log_dir / "verdicts"
+            d.mkdir(exist_ok=True)
+            np.savez_compressed(d / f"{time.time():.3f}_{'echo' if is_echo else 'owner'}.npz",
+                                probe=np.frombuffer(bytes(self.probe_pcm), dtype=np.int16),
+                                sim_watson=sw if sw is not None else -1.0,
+                                sim_owner=so if so is not None else -1.0)
+        except Exception as e:
+            self.log_event("verdict_dump_error", err=repr(e)[:120])
 
     def _dump_barge(self):
         """Mic mode diagnostics: save the probe audio and the playback
