@@ -304,6 +304,11 @@ class WatsonAgent(FrameProcessor):
         barge probe can be told apart from Watson's echo by WHO is speaking:
         acoustic echo correlation fails on the Pi (separate mic/speaker
         clocks, room reverb), but the speaker embedding survives the room."""
+        if self.mode == "mic":
+            # leave CPU for audio: 4 torch threads made playback stutter on
+            # the Pi (embed ~400 ms on all cores; 2 threads ~0.5 s)
+            import torch
+            torch.set_num_threads(2)
         self.spk._encoder()
         if self.mode != "mic":
             return
@@ -381,7 +386,10 @@ class WatsonAgent(FrameProcessor):
                 self.probe_ms += ms
                 self.probe_rms_peak = max(self.probe_rms_peak, rms)
                 echo = 0.0
-                if (self.probe_ms >= 200
+                # waveform echo check: bench only. On the Pi it cost 50 ms on
+                # the event loop every 100 ms (audible stutter) and scored
+                # 0.21-0.48 on real echo; mic mode uses the voice check instead
+                if (self.mode == "bench" and self.probe_ms >= 200
                         and self.probe_ms - self.echo_checked_ms >= 100):
                     self.echo_checked_ms = self.probe_ms
                     echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
@@ -922,6 +930,8 @@ class WatsonAgent(FrameProcessor):
         from pipecat.frames.frames import OutputAudioRawFrame
         chunk = 1200  # 50 ms at 24 kHz
         played = 0
+        prebuffer = 6  # first 300 ms pushed at once: slack against loop stalls
+        n_seg = 0
         while played < len(pcm):
             if self.gen != gen:
                 # interrupted: stash the unplayed PCM so we can resume
@@ -932,7 +942,9 @@ class WatsonAgent(FrameProcessor):
             ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
             self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
-            await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
+            n_seg += 1
+            if n_seg > prebuffer:
+                await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
 
     def log_event(self, event: str, **kw):
         rec = {"t": round(time.time(), 3), "event": event, **kw}
