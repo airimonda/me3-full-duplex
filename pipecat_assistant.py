@@ -130,6 +130,39 @@ def _voiced_db(pcm16: bytes) -> float:
     return float(20 * np.log10(np.median(r[r > r.max() * 0.1])))
 
 
+_ECHO_HIST_S = 3.0        # played audio kept as echo reference (16 kHz)
+_ECHO_CORR = 0.50         # xcorr at/above this = our own voice (duplex.py value)
+_ECHO_OVER = 1.6          # bursts must exceed the learned echo level by this
+_ECHO_RMS_CAP = 0.04      # learned echo level never grows past this (no lock-out)
+
+
+def _resample(samples: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
+    if sr_in == sr_out or len(samples) == 0:
+        return samples.astype(np.float32)
+    n = len(samples) * sr_out // sr_in
+    return np.interp(np.linspace(0, len(samples) - 1, n, endpoint=False),
+                     np.arange(len(samples)), samples).astype(np.float32)
+
+
+def xcorr_echo_score(candidate, reference, sr=16000):
+    """Copied from duplex.py: max normalized cross-correlation of the mic
+    burst against played audio, searched over the WHOLE reference (both at
+    16 kHz). The old in-class check compared 16 kHz mic against 24 kHz
+    playback over a +-100 ms window and never fired."""
+    n = min(len(candidate), len(reference), sr)   # cap candidate at 1 s
+    if n < sr // 10:
+        return 0.0
+    c = candidate[:n] - candidate[:n].mean()
+    best = 0.0
+    limit = len(reference) - n
+    for d in range(0, max(limit, 0) + 1, 80):
+        r = reference[d:d + n]
+        r = r - r.mean()
+        denom = (np.linalg.norm(c) * np.linalg.norm(r)) + 1e-9
+        best = max(best, float(np.dot(c, r) / denom))
+    return best
+
+
 def _token_set(s):
     return set(re.findall(r"[a-z0-9']+", s.lower()))
 
@@ -232,8 +265,11 @@ class WatsonAgent(FrameProcessor):
         self.probe_ms = 0.0
         self.probe_rms_peak = 0.0
         self.probe_pcm = bytearray()   # mic audio captured during the probe
-        self.play_ref = None           # pcm currently being played (echo reference)
-        self.play_pos = 0              # samples of play_ref already pushed
+        # echo reference: last _ECHO_HIST_S of pushed playback, resampled to
+        # 16 kHz so it matches the mic; plus the learned self-echo level
+        self.played16 = np.zeros(0, dtype=np.float32)
+        self.echo_rms = None
+        self.echo_checked_ms = 0.0
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
@@ -283,12 +319,20 @@ class WatsonAgent(FrameProcessor):
                 self.probe_pcm.extend(pcm)
                 self.probe_ms += ms
                 self.probe_rms_peak = max(self.probe_rms_peak, rms)
-                echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
-                if echo > 0.5:
-                    # Watson's own voice coming back — abort silently
+                echo = 0.0
+                if (self.probe_ms >= 200
+                        and self.probe_ms - self.echo_checked_ms >= 100):
+                    self.echo_checked_ms = self.probe_ms
+                    echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
+                if echo >= _ECHO_CORR:
+                    # Watson's own voice coming back — abort silently, and
+                    # learn how loud our echo is (duplex.py note_echo)
                     self.probing = False
                     self.probe_pcm = bytearray()
-                    self.log_event("echo_ignored", echo=round(echo, 2))
+                    self.echo_rms = min(_ECHO_RMS_CAP,
+                                        max(self.echo_rms or 0.0, self.probe_rms_peak))
+                    self.log_event("echo_ignored", echo=round(echo, 2),
+                                   echo_rms=round(self.echo_rms, 3))
                 elif state == VADState.QUIET and rms < floor:
                     self.probing = False
                     self.probe_pcm = bytearray()
@@ -309,10 +353,13 @@ class WatsonAgent(FrameProcessor):
                     self.barged = True
                     await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
                     self.log_event("barge_in", rms=round(self.probe_rms_peak, 3))
-            elif state != VADState.QUIET and rms > floor:
+            elif (state != VADState.QUIET and rms > floor
+                    and rms > (self.echo_rms or 0.0) * _ECHO_OVER):
                 # suspect a barge: confirm over the probe window first
+                # (bursts below the learned echo level are our own voice)
                 self.probing = True
                 self.probe_ms = 0.0
+                self.echo_checked_ms = 0.0
                 self.probe_rms_peak = rms
                 self.probe_pcm = bytearray(pcm)  # start the probe buffer with this frame
             else:
@@ -745,32 +792,15 @@ class WatsonAgent(FrameProcessor):
         await self._play_pcm(_wav_pcm(wav), gen)
 
     def _echo_score(self, mic: np.ndarray) -> float:
-        """Normalized correlation of the probe mic audio against the audio
-        Watson is currently playing (searching a small delay window).
-        High score = the mic is hearing Watson's own voice."""
-        if self.play_ref is None or len(mic) < 400:
+        """High score = the mic is hearing Watson's own voice."""
+        if len(mic) < 400 or len(self.played16) < 1600:
             return 0.0
-        ref = np.frombuffer(self.play_ref, dtype=np.int16).astype(np.float32)
-        m = mic.astype(np.float32)
-        if np.std(m) < 1e-6:
-            return 0.0
-        best = 0.0
-        # the mic hears what was played ~0-100 ms ago; play_pos is in samples
-        base = max(0, self.play_pos - len(m))
-        for off in range(-800, 2401, 160):
-            s = ref[max(0, base + off):base + off + len(m)]
-            if len(s) != len(m) or np.std(s) < 1e-6:
-                continue
-            c = abs(float(np.corrcoef(m, s)[0, 1]))
-            best = max(best, c)
-        return best
+        return xcorr_echo_score(mic.astype(np.float32), self.played16)
 
     async def _play_pcm(self, pcm: bytes, gen: int):
         from pipecat.frames.frames import OutputAudioRawFrame
         chunk = 1200  # 50 ms at 24 kHz
         played = 0
-        self.play_ref = pcm
-        self.play_pos = 0
         while played < len(pcm):
             if self.gen != gen:
                 # interrupted: stash the unplayed PCM so we can resume
@@ -778,7 +808,8 @@ class WatsonAgent(FrameProcessor):
                 return
             seg = pcm[played:played + chunk * 2]
             played += len(seg)
-            self.play_pos = played // 2
+            ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
+            self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
             await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
 
