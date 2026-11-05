@@ -548,7 +548,9 @@ class WatsonAgent(FrameProcessor):
         gen = self.gen
         # volume gate: TV/radio clips sit far below live speech level
         peak = float(np.max(np.abs(np.frombuffer(utt_pcm, dtype=np.int16)))) / 32768.0
-        if peak < 0.10:
+        # bench only: in mic mode the voice-ID gate rejects TV/strangers, and
+        # this fixed level dropped the owner at normal USB-mic gain (Nov 5)
+        if self.mode == "bench" and peak < 0.10:
             self.log_event("ignored_quiet", peak=round(peak, 3))
             return
         # faint-speech gate (bench only; mic mode has the voice-ID gate):
