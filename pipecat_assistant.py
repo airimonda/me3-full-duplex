@@ -270,6 +270,8 @@ class WatsonAgent(FrameProcessor):
         self.played16 = np.zeros(0, dtype=np.float32)
         self.echo_rms = None
         self.echo_checked_ms = 0.0
+        self.last_task_check = 0.0
+        self.announce_task = None
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
@@ -387,6 +389,35 @@ class WatsonAgent(FrameProcessor):
         else:
             # idle: keep learning the ambient noise floor
             self.ambient_rms = 0.9 * self.ambient_rms + 0.1 * rms
+            # finished background tasks: announce once per second check,
+            # only while nobody is talking and no reply is in flight
+            now = time.monotonic()
+            if (self.mode == "mic" and now - self.last_task_check >= 1.0
+                    and (self.respond_task is None or self.respond_task.done())
+                    and (self.announce_task is None or self.announce_task.done())):
+                self.last_task_check = now
+                self.announce_task = asyncio.create_task(self._announce_finished())
+
+    async def _announce_finished(self):
+        """Speak the line for each newly finished background task (ported
+        from legacy/chat.py's idle loop) and open its deliverable."""
+        try:
+            done = self.taskmgr.check_finished()
+        except Exception as e:
+            self.log_event("announce_error", err=repr(e)[:120])
+            return
+        for tid in done:
+            line = self.taskmgr.announcement(tid)
+            if not line:
+                continue
+            gen = self.gen
+            wav = await self._speak(line)
+            if wav and self.gen == gen and not self.in_speech:
+                self.playing = True
+                await self._play_pcm(_wav_pcm(wav), gen)
+                self.playing = False
+            opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
+            self.log_event("announce", id=tid, line=line, opened=opened)
 
     # ---- brain -----------------------------------------------------------
     def _set_timer_local(self, secs: int, label: str) -> str:
