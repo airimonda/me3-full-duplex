@@ -9,6 +9,7 @@ Endpoints (HTTP, for the Pi's asr-mcp / tts-mcp proxies):
 Run:  ~/me3/venv/bin/python ~/me3/server.py   (listens on 0.0.0.0:8300)
 """
 import io
+import os
 import json
 import time
 import wave
@@ -19,6 +20,11 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from kokoro import KPipeline
+
+# Watson's voice. am_onyx scored farthest from the owner's enrolled voice
+# (resemblyzer sim 0.444 vs 0.631 for the old af_heart), so the speaker check
+# can tell Watson's own echo from the owner (2026-11-05 voice scan).
+TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_onyx")
 from mlx_whisper import transcribe
 
 ASR_MODEL = "mlx-community/whisper-large-v3-turbo"
@@ -41,7 +47,7 @@ def load_models():
     t1 = time.perf_counter()
     pipe = KPipeline(lang_code="a")
     # warm TTS with a short utterance
-    for _ in pipe("Hello.", voice="af_heart"):
+    for _ in pipe("Hello.", voice=TTS_VOICE):
         pass
     print(f"[server] ASR warm in {t1-t0:.1f}s, TTS warm in {time.perf_counter()-t1:.1f}s", flush=True)
     global asr_ready, tts_ready
@@ -106,7 +112,7 @@ def warm_precache():
     global _precache_wavs
     for key, text in PRECACHE.items():
         try:
-            frames = [a for _, _, a in pipe(text, voice="af_heart")]
+            frames = [a for _, _, a in pipe(text, voice=TTS_VOICE)]
             _precache_wavs[key] = _wav_bytes(np.concatenate(frames))
         except Exception as e:
             print(f"[precache] {key} failed: {e}", flush=True)
@@ -125,7 +131,7 @@ def speak_cache(key: str):
 @app.post("/speak")
 def speak_ep(payload: dict):
     text = payload.get("text", "").strip()
-    voice = payload.get("voice", "af_heart")
+    voice = payload.get("voice", TTS_VOICE)
     if not text:
         return Response(json.dumps({"error": "empty text"}), status_code=400,
                         media_type="application/json")

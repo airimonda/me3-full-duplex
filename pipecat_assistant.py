@@ -36,6 +36,8 @@ ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
 TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
+# must match server.py's default (am_onyx: farthest from the owner's voice)
+TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_onyx")
 # answers when the talker streams empty twice in a row ("" disables)
 FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
@@ -270,6 +272,8 @@ class WatsonAgent(FrameProcessor):
         self.played16 = np.zeros(0, dtype=np.float32)
         self.echo_rms = None
         self.echo_checked_ms = 0.0
+        self.echo_best = 0.0
+        self.last_verdict = None
         self.last_task_check = 0.0
         self.announce_task = None
         # speaker enrollment: same profile file as the live loop (chat.py)
@@ -291,7 +295,62 @@ class WatsonAgent(FrameProcessor):
         # the resemblyzer encoder takes ~100 s to load — warm it in the
         # background so the first gated turn doesn't freeze
         import threading
-        threading.Thread(target=self.spk._encoder, daemon=True).start()
+        self.watson_emb = None     # embedding of Watson's own TTS voice
+        self.verify_task = None    # in-flight voice check of a barge probe
+        threading.Thread(target=self._warm_voices, daemon=True).start()
+
+    def _warm_voices(self):
+        """Load the encoder, then (mic mode) embed Watson's own voice so a
+        barge probe can be told apart from Watson's echo by WHO is speaking:
+        acoustic echo correlation fails on the Pi (separate mic/speaker
+        clocks, room reverb), but the speaker embedding survives the room."""
+        self.spk._encoder()
+        if self.mode != "mic":
+            return
+        try:
+            r = httpx.post(SERVER + "/speak", timeout=60, json={"voice": TTS_VOICE,
+                "text": "The Eiffel Tower was built in Paris for the World Fair. "
+                        "Sure, I can help with that, it is three in the afternoon."})
+            a = np.frombuffer(_wav_pcm(r.content), dtype=np.int16)
+            a = _resample(a, _OUT_SR, _IN_SR) / 32768.0
+            self.watson_emb = self.spk.embed((a / (np.abs(a).max() + 1e-9)).astype(np.float32))
+            self.log_event("watson_voice_ready", voice=TTS_VOICE,
+                           sim_owner=(round(float(np.dot(self.watson_emb, self.speaker)), 3)
+                                      if self.speaker is not None else None))
+        except Exception as e:
+            self.log_event("watson_voice_error", err=repr(e)[:120])
+
+    async def _voice_verdict(self, pcm: bytes):
+        """(is_echo, sim_watson, sim_owner) for a barge probe. Fails open:
+        any problem returns is_echo=False so a real barge still stops."""
+        a = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        a = a / (np.abs(a).max() + 1e-9)
+        e = await asyncio.to_thread(self.spk.embed, a)
+        if e is None or self.watson_emb is None or self.speaker is None:
+            return False, None, None
+        sw, so = float(np.dot(e, self.watson_emb)), float(np.dot(e, self.speaker))
+        return sw > so, round(sw, 3), round(so, 3)
+
+    async def _commit_barge(self):
+        from pipecat.frames.frames import InterruptionFrame
+        from pipecat.processors.frame_processor import FrameDirection
+        # sustained speech that is NOT echo: commit the interruption
+        self.probing = False
+        self.verify_task = None
+        # the probe window IS the start of the interrupting utterance —
+        # keep it, or a short backchannel ("uh-huh yeah", <1 s) reaches ASR
+        # as only its silent tail (ignored_quiet peak 0.0) and resume never fires
+        self.buf = self.probe_pcm
+        self.speech_ms = self.probe_ms
+        self.probe_pcm = bytearray()
+        self.gen += 1
+        self.playing = False
+        self.in_speech = True
+        self.barged = True
+        await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
+        self.log_event("barge_in", rms=round(self.probe_rms_peak, 3),
+                       echo_best=round(self.echo_best, 3), voice=self.last_verdict)
+        self._dump_barge()
 
     # ---- audio path ------------------------------------------------------
     async def process_frame(self, frame, direction):
@@ -326,6 +385,7 @@ class WatsonAgent(FrameProcessor):
                         and self.probe_ms - self.echo_checked_ms >= 100):
                     self.echo_checked_ms = self.probe_ms
                     echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
+                    self.echo_best = max(self.echo_best, echo)
                 if echo >= _ECHO_CORR:
                     # Watson's own voice coming back — abort silently, and
                     # learn how loud our echo is (duplex.py note_echo)
@@ -338,23 +398,32 @@ class WatsonAgent(FrameProcessor):
                 elif state == VADState.QUIET and rms < floor:
                     self.probing = False
                     self.probe_pcm = bytearray()
-                    self.log_event("probe_resume", probe_ms=round(self.probe_ms, 1))
+                    self.log_event("probe_resume", probe_ms=round(self.probe_ms, 1),
+                                   echo_best=round(self.echo_best, 3))
                 elif self.probe_ms >= 600:
-                    # sustained speech that is NOT echo: commit the interruption
-                    self.probing = False
-                    # the probe window IS the start of the interrupting
-                    # utterance — keep it, or a short backchannel ("uh-huh
-                    # yeah", <1 s) reaches ASR as only its silent tail
-                    # (ignored_quiet peak 0.0) and resume never fires
-                    self.buf = self.probe_pcm
-                    self.speech_ms = self.probe_ms
-                    self.probe_pcm = bytearray()
-                    self.gen += 1
-                    self.playing = False
-                    self.in_speech = True
-                    self.barged = True
-                    await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
-                    self.log_event("barge_in", rms=round(self.probe_rms_peak, 3))
+                    # mic mode: before stopping, check WHO is speaking —
+                    # Watson's own echo sounds like Watson, not the owner.
+                    # Playback keeps running while the check runs (no pause).
+                    if (self.mode == "mic" and self.watson_emb is not None
+                            and self.speaker is not None):
+                        if self.verify_task is None:
+                            self.verify_task = asyncio.create_task(
+                                self._voice_verdict(bytes(self.probe_pcm)))
+                        elif self.verify_task.done():
+                            is_echo, sw, so = self.verify_task.result()
+                            self.verify_task = None
+                            self.last_verdict = {"sim_watson": sw, "sim_owner": so}
+                            if is_echo:
+                                self.probing = False
+                                self.probe_pcm = bytearray()
+                                self.log_event("echo_ignored", by="voice",
+                                               sim_watson=sw, sim_owner=so,
+                                               rms=round(self.probe_rms_peak, 3))
+                            else:
+                                await self._commit_barge()
+                    else:
+                        self.last_verdict = None
+                        await self._commit_barge()
             elif (state != VADState.QUIET and rms > floor
                     and rms > (self.echo_rms or 0.0) * _ECHO_OVER):
                 # suspect a barge: confirm over the probe window first
@@ -362,6 +431,9 @@ class WatsonAgent(FrameProcessor):
                 self.probing = True
                 self.probe_ms = 0.0
                 self.echo_checked_ms = 0.0
+                self.echo_best = 0.0
+                self.verify_task = None
+                self.last_verdict = None
                 self.probe_rms_peak = rms
                 self.probe_pcm = bytearray(pcm)  # start the probe buffer with this frame
             else:
@@ -814,13 +886,29 @@ class WatsonAgent(FrameProcessor):
                 return None
             return r.content
         r = await self.http.post(f"{SERVER}/speak",
-                                 json={"text": text, "voice": "af_heart"})
+                                 json={"text": text, "voice": TTS_VOICE})
         if r.status_code != 200:
             return None
         return r.content
 
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
+
+    def _dump_barge(self):
+        """Mic mode diagnostics: save the probe audio and the playback
+        reference of every committed barge-in, to tune the echo check on
+        real room audio (runs/live/barges/<t>.npz)."""
+        if self.mode != "mic":
+            return
+        try:
+            d = self.log_dir / "barges"
+            d.mkdir(exist_ok=True)
+            np.savez_compressed(d / f"{time.time():.3f}.npz",
+                                probe=np.frombuffer(bytes(self.buf), dtype=np.int16),
+                                ref=self.played16.astype(np.float32),
+                                echo_best=self.echo_best)
+        except Exception as e:
+            self.log_event("barge_dump_error", err=repr(e)[:120])
 
     def _echo_score(self, mic: np.ndarray) -> float:
         """High score = the mic is hearing Watson's own voice."""
