@@ -35,7 +35,7 @@ from pipecat.processors.frame_processor import FrameProcessor
 ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
-TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3")
+TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
@@ -83,6 +83,15 @@ _PROMPT_GATE = (
     "and do NOT say SILENT for it. When unsure between ANSWER and SILENT, choose "
     "ANSWER."
 )
+# bench mode: the talker answers directly (same-system rule: no agent harness
+# in the benchmark loop). "Describe X comprehensively" prompts otherwise get
+# DELEGATEd: 10-15 s to first token, a 5 s ack, then "hands full" on every
+# later trial while the background slots stay busy.
+_PROMPT_BENCH_NODELEGATE = (
+    " BENCHMARK OVERRIDE: never use the DELEGATE tag. For any request, however "
+    "broad or 'comprehensive', answer it yourself right away in one or two short "
+    "spoken sentences, under 25 words in total."
+)
 # mic mode: voice enrollment already rejects strangers/TV, so the SILENT gate
 # is redundant there and kept eating real commands ("build me a Mario game").
 # Benchmark mode keeps the gate (overheard clips, no voice check possible).
@@ -113,16 +122,21 @@ def _token_set(s):
     return set(re.findall(r"[a-z0-9']+", s.lower()))
 
 _IN_SR = 16000
+_TALKER_TEMP = float(os.environ.get("ME3_TALKER_TEMP", "0"))
+_HIST_KEEP = int(os.environ.get("ME3_HIST_KEEP", "12"))  # messages kept besides system
 _OUT_SR = 24000
 # USB PnP mics only accept 48k directly via PortAudio; capture at 48k and
 # downsample to 16k before VAD/ASR (no-op when the mic supports 16k).
 _MIC_SR = int(os.environ.get("ME3_MIC_SR", "48000"))
 
 
-def _to_in_sr(samples: np.ndarray) -> np.ndarray:
-    if _MIC_SR == _IN_SR:
+def _to_in_sr(samples: np.ndarray, sr: int) -> np.ndarray:
+    # resample by the FRAME's own rate: mic mode captures at _MIC_SR (48k),
+    # the bench transport delivers 16k — gating on _MIC_SR silently dropped
+    # every bench frame (no turns at all after the Nov 4 Pi patch)
+    if sr == _IN_SR:
         return samples
-    n = len(samples) * _IN_SR // _MIC_SR
+    n = len(samples) * _IN_SR // sr
     return np.interp(np.linspace(0, len(samples) - 1, n, endpoint=False),
                      np.arange(len(samples)), samples).astype(np.int16)
 _ENDPOINT_MS = 600
@@ -218,7 +232,8 @@ class WatsonAgent(FrameProcessor):
         self.mode = os.environ.get("ME3_MODE", "bench")
         # chat.py's full prompt (tools + delegation rules) in both modes; the
         # addressed-speech gate paragraph is bench-only (mic uses voice enrollment)
-        sysprompt = chatbrain.SYSTEM_PROMPT + (_PROMPT_GATE if self.mode == "bench" else "")
+        sysprompt = chatbrain.SYSTEM_PROMPT + (_PROMPT_GATE + _PROMPT_BENCH_NODELEGATE
+                                                if self.mode == "bench" else "")
         self.history = [{"role": "system", "content": sysprompt}]
         self.spk = speakerid
         self.speaker = speakerid.load_profile()
@@ -232,8 +247,9 @@ class WatsonAgent(FrameProcessor):
         await super().process_frame(frame, direction)
         from pipecat.frames.frames import InputAudioRawFrame
         from pipecat.processors.frame_processor import FrameDirection
-        if isinstance(frame, InputAudioRawFrame) and frame.sample_rate == _MIC_SR:
-            await self._on_audio(_to_in_sr(np.frombuffer(frame.audio, dtype=np.int16)))
+        if isinstance(frame, InputAudioRawFrame):
+            await self._on_audio(_to_in_sr(np.frombuffer(frame.audio, dtype=np.int16),
+                                           frame.sample_rate))
         else:
             await self.push_frame(frame, direction)
 
@@ -267,10 +283,15 @@ class WatsonAgent(FrameProcessor):
                 elif self.probe_ms >= 600:
                     # sustained speech that is NOT echo: commit the interruption
                     self.probing = False
+                    # the probe window IS the start of the interrupting
+                    # utterance — keep it, or a short backchannel ("uh-huh
+                    # yeah", <1 s) reaches ASR as only its silent tail
+                    # (ignored_quiet peak 0.0) and resume never fires
+                    self.buf = self.probe_pcm
+                    self.speech_ms = self.probe_ms
                     self.probe_pcm = bytearray()
                     self.gen += 1
                     self.playing = False
-                    self.buf = bytearray()
                     self.in_speech = True
                     self.barged = True
                     await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
@@ -411,7 +432,11 @@ class WatsonAgent(FrameProcessor):
         # speaker gate: same voice profile the live loop uses.
         # Normalize first — the raw mic level here is low and embed()'s
         # silence-trim would otherwise discard the whole utterance.
-        no_gate = self.mode == "bench" or low.startswith("watson")
+        # wake-prefixed speech skips BOTH gates. Do NOT add `mode == "bench"`
+        # here: it disables bench's SILENT gate (SILENT then gets spoken and
+        # overheard-speech resume never runs). The voice gate below is
+        # already mic-only.
+        no_gate = low.startswith("watson")
         if no_gate and low.startswith("watson") and len(low) > 6:
             text = text.strip()[7:].strip(" ,.!?") or text.strip()
         norm = np.frombuffer(utt_pcm, dtype=np.int16).astype(np.float32)
@@ -481,13 +506,22 @@ class WatsonAgent(FrameProcessor):
                                total_s=round(time.perf_counter() - t0, 3))
                 return
         self.history.append({"role": "user", "content": text})
+        # cap context: talker first-token grows with history (glm-5.3-flash:
+        # 1.1-2.0 s at 2 msgs vs 2.0-3.7 s at 54; bench spikes hit 7-10 s and
+        # missed the 8 s turn window). Keep system + the last _HIST_KEEP
+        # messages, cut at a user message so no tool reply loses its call.
+        if len(self.history) > _HIST_KEEP + 1:
+            tail = self.history[-_HIST_KEEP:]
+            while tail and tail[0]["role"] != "user":
+                tail.pop(0)
+            self.history = [self.history[0]] + tail
         reply = ""
         ack = None
         delegate_rest = False
         first_audio = None
         # bench mode: hard-cap the reply so playback never bleeds into the
         # next trial (36 s replies caused false TORs at trial boundaries)
-        max_words = 60 if self.mode == "bench" else 400
+        max_words = 35 if self.mode == "bench" else 400
         first_token = None
 
         async def one_pass(msgs, use_tools):
@@ -497,7 +531,10 @@ class WatsonAgent(FrameProcessor):
             calls = {}
             buf = ""
             body = {"model": TALKER_MODEL, "messages": msgs, "stream": True,
-                    "max_tokens": 400}
+                    "max_tokens": 400,
+                    # deterministic gate: at the provider default temperature the
+                    # SILENT/ANSWER call flipped run to run on identical audio
+                    "temperature": _TALKER_TEMP}
             if use_tools:
                 body["tools"] = self.tools
             stream = await self.http.post(
@@ -624,7 +661,11 @@ class WatsonAgent(FrameProcessor):
             print("[watson] respond_error:", traceback.format_exc()[-300:], flush=True)
         finally:
             self.playing = False
-            self.barged = False
+            # an interrupted turn must NOT clear the barge flag: the barge
+            # bumped gen, and the interrupting utterance (ASR'd ~1 s later)
+            # needs barged + resume_pcm to decide backchannel-resume
+            if self.gen == gen:
+                self.barged = False
             total = time.perf_counter() - t0
             if reply.strip():
                 self.history.append({"role": "assistant", "content": reply})
@@ -746,7 +787,7 @@ async def build(transport, log_dir: Path):
 
     worker = PipelineWorker(
         Pipeline([transport.input(), agent, transport.output()]),
-        params=PipelineParams(audio_in_sample_rate=_MIC_SR, audio_out_sample_rate=_OUT_SR),
+        params=PipelineParams(audio_in_sample_rate=_IN_SR, audio_out_sample_rate=_OUT_SR),
         enable_tracing=False,
         cancel_on_idle_timeout=False,  # quiet stretches between trials must not kill us
     )
