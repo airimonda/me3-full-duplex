@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Watson Machine Exercise</title>
+<style>
+:root {
+  /* Course template look: navy header band, orange rule and markers,
+     grey-blue panels. Two fixed 16:9 pages, two-column grid each. */
+  --navy: #18233f;
+  --orange: #e8742a;
+  --ink: #1f2430;
+  --muted: #5d6676;
+  --panel: #edf0f5;
+  --rule: #c9d0db;
+  --teal: #1d7a86;
+  --red: #c4472b;
+  --font: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --mono: Menlo, "Courier New", monospace;
+}
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font: 11px/1.38 var(--font); }
+.page { width: 1280px; height: 720px; position: relative; overflow: hidden; page-break-after: always; break-after: page; }
+.page:last-child { page-break-after: auto; break-after: auto; }
+header.band { background: var(--navy); color: #fff; height: 108px; padding: 26px 64px 0; border-bottom: 6px solid var(--orange); position: relative; }
+.kicker { color: var(--orange); font-weight: 700; font-size: 12px; letter-spacing: 0.02em; }
+header h1 { margin: 4px 0 0; font-size: 26px; font-weight: 700; }
+header .right { position: absolute; right: 64px; top: 58px; font-style: italic; color: #c8cfdc; font-size: 13px; }
+.body { position: absolute; top: 126px; left: 64px; right: 64px; bottom: 34px; }
+.sec { display: flex; align-items: baseline; gap: 10px; margin: 0 0 7px; }
+.num { background: var(--orange); color: #fff; font-weight: 700; font-size: 12px; width: 20px; height: 20px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; position: relative; top: 2px; }
+.sec h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--navy); letter-spacing: 0.01em; }
+.sec .hint { font-style: italic; color: #8a93a3; font-size: 11.5px; }
+ul.dash { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+ul.dash li { padding-left: 12px; position: relative; }
+ul.dash li::before { content: "-"; color: var(--orange); position: absolute; left: 0; font-weight: 700; }
+.mono { font-family: var(--mono); }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; }
+.dev { color: var(--red); font-weight: 700; }
+footer.foot { position: absolute; left: 64px; right: 64px; bottom: 10px; border-top: 1px solid var(--rule); padding-top: 5px; display: flex; justify-content: space-between; color: #8a93a3; font-size: 10px; }
+footer.foot b { color: var(--muted); }
+/* page 1 */
+.p1 { display: grid; grid-template-columns: 640px 1fr; grid-template-rows: auto 1fr; gap: 6px 26px; height: 100%; }
+.diag svg { display: block; width: 580px; height: 256px; }
+.bar { background: var(--navy); color: #fff; font-family: var(--mono); font-size: 10.5px; text-align: center; padding: 5px 6px; border-radius: 4px; margin-top: 5px; }
+.barge { color: var(--orange); font-family: var(--mono); font-weight: 700; font-size: 10px; text-align: center; margin-top: 3px; }
+.prompt { padding: 6px 10px; font-family: var(--mono); font-size: 8.9px; line-height: 1.34; }
+.prompt .h { color: var(--teal); font-weight: 700; margin-bottom: 4px; font-size: 10px; }
+.prompt .x { color: var(--muted); font-family: var(--font); font-size: 9.2px; margin-top: 3px; line-height: 1.3; }
+.ctx { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ctx h3 { margin: 0 0 4px; color: var(--teal); font-size: 11.5px; }
+.ctx ul.dash { font-size: 9.8px; gap: 1px; line-height: 1.3; }
+/* page 2 */
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th { background: var(--navy); color: #fff; text-align: left; font-size: 10.5px; padding: 4px 7px; }
+td { border: 1px solid var(--rule); padding: 3px 7px; vertical-align: top; font-size: 10px; line-height: 1.3; }
+tr:nth-child(even) td { background: #f5f7fa; }
+.p2top { height: 238px; }
+.p2mid { display: grid; grid-template-columns: 1fr 548px; gap: 22px; margin-top: 8px; }
+.eval td.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 8px; }
+.box { padding: 7px 11px; font-size: 9.5px; line-height: 1.32; height: 158px; overflow: hidden; }
+.box h3 { margin: 0 0 4px; color: var(--teal); font-size: 11.5px; }
+.box ol { margin: 0; padding-left: 15px; display: grid; gap: 1px; }
+.chart { display: flex; height: 13px; border-radius: 2px; overflow: hidden; margin: 4px 0 2px; font-size: 8.5px; color: #fff; font-family: var(--mono); }
+.chart span { display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+.legend { display: flex; justify-content: space-between; color: var(--muted); font-size: 8.5px; font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- ======================= PAGE 1 ======================= -->
+<section class="page">
+  <header class="band">
+    <div class="kicker">MACHINE EXERCISE · ME3 · WATSON · A. MONDARES · NOV 7, 2026</div>
+    <h1>Full-Duplex Voice Agent on a Raspberry Pi</h1>
+    <div class="right">sections 1–6 in priority order</div>
+  </header>
+  <div class="body">
+    <div class="p1">
+
+      <!-- 1 SYSTEM DIAGRAM -->
+      <div class="diag">
+        <div class="sec"><span class="num">1</span><h2>SYSTEM DIAGRAM</h2><span class="hint">the one diagram that explains the build</span></div>
+        <svg viewBox="0 0 640 282" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+          <defs>
+            <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#18233f"/></marker>
+            <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c4472b"/></marker>
+          </defs>
+          <!-- zones -->
+          <rect x="1" y="1" width="300" height="280" rx="7" fill="#fff4ec" stroke="#e8742a" stroke-width="1.5"/>
+          <text x="12" y="17" font-size="10.5" font-weight="700" fill="#e8742a">ON THE RPi · Pi 4 Model B, 4 GB</text>
+          <rect x="314" y="1" width="186" height="280" rx="7" fill="#eef3fb" stroke="#18233f" stroke-width="1.2"/>
+          <text x="324" y="17" font-size="10.5" font-weight="700" fill="#18233f">MAC EXECUTOR · LAN 6 ms</text>
+          <rect x="512" y="1" width="127" height="280" rx="7" fill="#f2f2f2" stroke="#8a93a3" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <text x="522" y="17" font-size="10.5" font-weight="700" fill="#5d6676">CLOUD APIs</text>
+
+          <!-- Pi column -->
+          <rect x="14" y="28" width="122" height="30" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="75" y="41" font-size="10" text-anchor="middle" font-weight="700">USB mic</text>
+          <text x="75" y="52" font-size="8.5" text-anchor="middle" fill="#5d6676">48 kHz → 16 kHz mono</text>
+
+          <rect x="14" y="72" width="122" height="34" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="75" y="86" font-size="10" text-anchor="middle" font-weight="700">Silero VAD</text>
+          <text x="75" y="98" font-size="8.5" text-anchor="middle" fill="#5d6676">ONNX · 0.6 s endpoint</text>
+
+          <rect x="150" y="28" width="140" height="150" rx="4" fill="#fff" stroke="#e8742a" stroke-width="1.6"/>
+          <text x="220" y="43" font-size="10" text-anchor="middle" font-weight="700">WatsonAgent</text>
+          <text x="220" y="54" font-size="8.5" text-anchor="middle" fill="#5d6676">Pipecat 1.15 FrameProcessor</text>
+          <text x="158" y="72" font-size="8.6" fill="#1f2430">• wake word + 5-min idle gate</text>
+          <text x="158" y="85" font-size="8.6" fill="#1f2430">• owner voice gate</text>
+          <text x="166" y="96" font-size="8" fill="#5d6676">resemblyzer, sim ≥ 0.60</text>
+          <text x="158" y="110" font-size="8.6" fill="#1f2430">• barge-in probe (600 ms)</text>
+          <text x="158" y="124" font-size="8.6" fill="#1f2430">• tools: brain.execute_tool</text>
+          <text x="166" y="135" font-size="8" fill="#5d6676">15 functions, in-process</text>
+          <text x="158" y="149" font-size="8.6" fill="#1f2430">• history: last 12 msgs</text>
+          <text x="158" y="163" font-size="8.6" fill="#1f2430">• JSONL log per run</text>
+
+          <rect x="14" y="196" width="122" height="30" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="75" y="209" font-size="10" text-anchor="middle" font-weight="700">Playback</text>
+          <text x="75" y="220" font-size="8.5" text-anchor="middle" fill="#5d6676">24 kHz PCM, 50 ms chunks</text>
+
+          <rect x="14" y="240" width="122" height="30" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="75" y="253" font-size="10" text-anchor="middle" font-weight="700">Speaker</text>
+          <text x="75" y="264" font-size="8.5" text-anchor="middle" fill="#5d6676">3.5 mm jack, −6 dB</text>
+
+          <!-- Pi arrows -->
+          <line x1="75" y1="58" x2="75" y2="71" stroke="#18233f" marker-end="url(#a)"/>
+          <line x1="136" y1="89" x2="149" y2="89" stroke="#18233f" marker-end="url(#a)"/>
+          <path d="M150,170 L110,170 L110,195" fill="none" stroke="#18233f" marker-end="url(#a)"/>
+          <line x1="75" y1="226" x2="75" y2="239" stroke="#18233f" marker-end="url(#a)"/>
+
+          <!-- barge-in loop -->
+          <path d="M14,43 L6,43 L6,211 L13,211" fill="none" stroke="#c4472b" stroke-width="1.4" stroke-dasharray="3 2" marker-end="url(#ar)"/>
+          <rect x="150" y="196" width="140" height="74" rx="4" fill="#fdf0ec" stroke="#c4472b"/>
+          <text x="158" y="210" font-size="9.2" font-weight="700" fill="#c4472b">BARGE-IN</text>
+          <text x="158" y="223" font-size="8.4" fill="#1f2430">speech while playing →</text>
+          <text x="158" y="235" font-size="8.4" fill="#1f2430">owner voice, not Watson's?</text>
+          <text x="158" y="247" font-size="8.4" fill="#1f2430">+ stop / wait / Watson →</text>
+          <text x="158" y="259" font-size="8.4" fill="#1f2430">flush audio, drop LLM stream</text>
+          <line x1="150" y1="226" x2="137" y2="215" stroke="#c4472b" marker-end="url(#ar)"/>
+
+          <!-- Mac column -->
+          <rect x="324" y="30" width="166" height="62" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="407" y="44" font-size="10" text-anchor="middle" font-weight="700">server.py :8300 (FastAPI)</text>
+          <text x="332" y="58" font-size="8.6">POST /transcribe → text</text>
+          <text x="340" y="69" font-size="8" fill="#5d6676">Whisper large-v3-turbo (MLX)</text>
+          <text x="332" y="82" font-size="8.6">POST /speak → wav</text>
+          <text x="428" y="82" font-size="8" fill="#5d6676">Kokoro-82M</text>
+
+          <rect x="324" y="104" width="166" height="40" rx="4" fill="#fff" stroke="#18233f" stroke-dasharray="4 3"/>
+          <text x="407" y="118" font-size="10" text-anchor="middle" font-weight="700">tts_mcp.py (our MCP)</text>
+          <text x="407" y="131" font-size="8.4" text-anchor="middle" fill="#5d6676">EfficientSpeech · stdio / HTTP</text>
+          <text x="407" y="141" font-size="8" text-anchor="middle" fill="#c4472b">prototype, not in the live loop</text>
+
+          <rect x="324" y="156" width="166" height="40" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="407" y="170" font-size="10" text-anchor="middle" font-weight="700">tasks.py (long tasks)</text>
+          <text x="407" y="183" font-size="8.4" text-anchor="middle" fill="#5d6676">pi.dev agent, sandbox-exec</text>
+          <text x="407" y="193" font-size="8" text-anchor="middle" fill="#5d6676">Mac only; Pi gives an ack</text>
+
+          <!-- Pi <-> Mac -->
+          <line x1="290" y1="56" x2="323" y2="56" stroke="#18233f" marker-end="url(#a)"/>
+          <text x="306" y="51" font-size="7.5" text-anchor="middle" fill="#5d6676">wav</text>
+          <line x1="323" y1="80" x2="291" y2="80" stroke="#18233f" marker-end="url(#a)"/>
+          <text x="306" y="91" font-size="7.5" text-anchor="middle" fill="#5d6676">pcm</text>
+
+          <!-- cloud -->
+          <rect x="520" y="30" width="111" height="66" rx="4" fill="#fff" stroke="#8a93a3"/>
+          <text x="575" y="44" font-size="9.6" text-anchor="middle" font-weight="700">OpenRouter</text>
+          <text x="575" y="57" font-size="8.4" text-anchor="middle">glm-5.3-flash</text>
+          <text x="575" y="69" font-size="8" text-anchor="middle" fill="#5d6676">stream + tool calls</text>
+          <text x="575" y="82" font-size="8" text-anchor="middle" fill="#5d6676">fallback gpt-4o-mini</text>
+          <rect x="520" y="108" width="111" height="40" rx="4" fill="#fff" stroke="#8a93a3"/>
+          <text x="575" y="123" font-size="9.6" text-anchor="middle" font-weight="700">web_search</text>
+          <text x="575" y="137" font-size="8" text-anchor="middle" fill="#5d6676">DuckDuckGo (ddgs)</text>
+          <path d="M290,40 C400,10 470,12 519,46" fill="none" stroke="#8a93a3" stroke-width="1.2" marker-end="url(#a)"/>
+          
+        </svg>
+        <div class="bar">mic → VAD (RPi) → ASR (Mac) → agent + tools (RPi) → LLM (cloud) → TTS (Mac) → speaker</div>
+        <div class="barge">barge-in: owner voice + stop word → flush TTS + drop LLM stream → listen</div>
+      </div>
+
+      <!-- right of diagram -->
+      <div>
+        <ul class="dash" style="font-size:11px; gap:5px; margin-top:28px">
+          <li>Mic → VAD on the RPi → <b>ASR on the Mac</b> → agent on the RPi → <b>TTS on the Mac</b> → speaker on the RPi.</li>
+          <li>Harness: <b>Pipecat 1.15</b>, one FrameProcessor (WatsonAgent). Stock transports only; the same agent runs the live mic and the benchmark socket.</li>
+          <li>LLM: <b>z-ai/glm-5.3-flash</b> via OpenRouter, streaming with function calling. 20 s read timeout, one retry, then <b>gpt-4o-mini</b>.</li>
+          <li><span class="dev">Deviation from the brief:</span> ASR and TTS are HTTP services on a MacBook Air M5, not MCP servers on the RPi. Whisper large-v3-turbo does not run in real time on a Pi 4. Tools are in-process function calls, not MCP.</li>
+          <li>MCP built by us: <b>tts_mcp.py</b> (EfficientSpeech Tiny, stdio + streamable HTTP, tools <span class="mono">speak</span>, <span class="mono">health</span>). Tested on the Mac; the Pi install is pending.</li>
+          <li>Barge-in cancels playback (InterruptionFrame) and the LLM stream (generation counter). The unplayed audio is stashed so a "yeah" backchannel can resume it.</li>
+          <li>Boundary: RPi = audio I/O, VAD, wake/idle and voice gates, agent loop, tools. Mac = ASR, TTS, long tasks. Cloud = LLM, web search.</li>
+        </ul>
+      </div>
+
+      <!-- 2 PROMPT -->
+      <div>
+        <div class="sec"><span class="num">2</span><h2>PROMPT</h2><span class="hint">in the repo, versioned: brain.py @ f481ce3 (Nov 5)</span></div>
+        <div class="panel prompt">
+          <div class="h">SYSTEM PROMPT (brain.py v f481ce3) · excerpt</div>
+          You are a voice assistant in a live spoken conversation. Reply in ONE or<br>
+          TWO short sentences, plain text, no markdown, no lists, no emoji.<br>
+          Handle music, lights, thermostat, timers, alarms, reminders and messages<br>
+          YOURSELF with these tools — never delegate them. get_time_in is exact for<br>
+          other cities (never web_search or guess times). Use web_search for facts<br>
+          you don't know. NEVER reply with a bare offer like 'would you like me<br>
+          to...' — always act. Never mention tools. If the request is incomplete or<br>
+          ambiguous, ask ONE short, natural clarifying question.
+          <div class="x">Barge-in ("stop and listen") is enforced in code, not in the prompt. Bench mode appends an addressed-speech rule and a 35-word cap. Before speaking, a code check catches deflections ("I can't check that") and retries with tools.</div>
+        </div>
+      </div>
+
+      <!-- 3 CONTEXT -->
+      <div>
+        <div class="sec"><span class="num">3</span><h2>CONTEXT ENGINEERING</h2></div>
+        <div class="ctx">
+          <div>
+            <h3>GOES IN:</h3>
+            <ul class="dash">
+              <li>System prompt (brain.py) + 15 tool schemas</li>
+              <li>Final Whisper transcript per turn, wake word stripped (no partials)</li>
+              <li>Tool results as tool messages</li>
+              <li>Conversation history (rolling)</li>
+              <li>VAD turn events drive the loop; they stay out of the context</li>
+              <li>Memory: in-conversation only, no RAG</li>
+            </ul>
+          </div>
+          <div>
+            <h3>MANAGED:</h3>
+            <ul class="dash">
+              <li>History capped at the last 12 messages, cut at a user turn so no tool reply loses its call</li>
+              <li>Why: TTFT 1.1–2.0 s at 2 msgs vs 2.0–3.7 s at 54</li>
+              <li>Stable system prefix first (cacheable)</li>
+              <li>idle (5 min) → listen → think → speak</li>
+              <li>On barge-in: generation++, stale audio and stream dropped</li>
+              <li>Context size logged per call (<span class="mono">llm_http.n_msgs</span>)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <footer class="foot"><span>Machine Exercise · Full-Duplex Voice Agent on Raspberry Pi · github.com/airimonda/me3-full-duplex</span><span>red = deviation from the template brief</span><b>2-page template · 1/2</b></footer>
+</section>
+
+<!-- ======================= PAGE 2 ======================= -->
+<section class="page">
+  <header class="band">
+    <div class="kicker">MACHINE EXERCISE · ME3 · WATSON</div>
+    <h1>MCP Services, Evaluation &amp; Model Serving</h1>
+    <div class="right">what runs where, measured on the RPi</div>
+  </header>
+  <div class="body">
+
+    <div class="p2top">
+      <div class="sec"><span class="num">4</span><h2>MCP SERVICES</h2><span class="hint">+ section 6: model serving (one table, one truth)</span></div>
+      <table>
+        <thead><tr><th style="width:84px">Component</th><th style="width:210px">Server / transport</th><th style="width:250px">Tools</th><th style="width:230px">Model</th><th>Served where / notes</th></tr></thead>
+        <tbody>
+          <tr><td><b>ASR</b></td><td>server.py <span class="mono">POST /transcribe</span>, HTTP <span class="dev">(not MCP)</span></td><td>transcribe(wav) → text</td><td>Whisper large-v3-turbo (mlx-whisper)</td><td>Mac M5; one final transcript per VAD endpoint, no partials</td></tr>
+          <tr><td><b>TTS</b></td><td>server.py <span class="mono">POST /speak</span>, <span class="mono">/speak_cache</span>; MCP: tts_mcp.py (stdio, HTTP)</td><td>speak(text) → wav; MCP: speak, health</td><td>Kokoro-82M, voice am_michael; MCP: EfficientSpeech Tiny</td><td>Mac M5; one request per sentence, streamed to the Pi in 50 ms chunks; flushed on barge-in</td></tr>
+          <tr><td><b>LLM</b></td><td>WatsonAgent (Pipecat harness), OpenAI-compatible streaming</td><td>function calling, 15 tools</td><td>z-ai/glm-5.3-flash; fallback openai/gpt-4o-mini</td><td>Cloud (OpenRouter); 20 s read timeout, 1 retry, then fallback</td></tr>
+          <tr><td><b>VAD</b></td><td>in-process</td><td>SileroVADAnalyzer(frames)</td><td>Silero VAD (ONNX)</td><td>RPi on-device, 16 kHz mono; start 0.1 s, stop 0.6 s</td></tr>
+          <tr><td><b>Speaker ID</b></td><td>in-process (speakerid.py)</td><td>similarity(pcm, profile)</td><td>resemblyzer (GE2E)</td><td>RPi; owner gate ≥ 0.60, echo check vs Watson's voice (0.44)</td></tr>
+          <tr><td><b>Tasks</b></td><td>in-process <span class="mono">brain.execute_tool</span> <span class="dev">(not MCP)</span></td><td>get_time, get_time_in, web_search, lights_control, thermostat_set, set_timer, set_alarm, add_reminder, list_items, spotify_*, contact_message</td><td>n/a (web_search: ddgs; long tasks: pi.dev agent)</td><td>RPi; home state is virtual (JSON); long-task delegation runs on the Mac only</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="p2mid">
+      <div>
+        <div class="sec"><span class="num">5</span><h2>EVALUATION &amp; BENCHMARK</h2><span class="hint">standardized latency method</span></div>
+        <ul class="dash" style="font-size:10.6px">
+          <li>One clock: RPi <span class="mono">time.perf_counter</span>; t0 = utterance committed by VAD.</li>
+          <li>Per turn: <span class="mono">asr_s → first_token_s → first_audio_s → total_s</span>.</li>
+          <li>E2E = first_audio_s + 0.6 s endpoint wait. Barge-in = stopwatch (not instrumented).</li>
+          <li><b>101</b> live owner turns, Nov 4–6 (mic mode); TTS also 5 phrases × 4 runs on the Mac. JSON log per run.</li>
+          <li>Full-Duplex-Bench baseline #0 (Nov 5): pause TOR 0/2 + 0/2, interrupt TOR 2/2, false turns 1/4.</li>
+        </ul>
+      </div>
+      <div>
+        <table class="eval">
+          <thead><tr><th>Metric</th><th>Definition</th><th style="width:56px">Target</th><th style="width:52px">Mean</th><th style="width:52px">p95</th><th style="width:60px">Median</th></tr></thead>
+          <tbody>
+            <tr><td><b>E2E latency</b></td><td>end of speech → audio out</td><td class="n">1.5 s</td><td class="n">4.44</td><td class="n">10.31</td><td class="n">4.97</td></tr>
+            <tr><td><b>ASR final</b></td><td>commit → transcript</td><td class="n">—</td><td class="n">2.81</td><td class="n">11.91</td><td class="n">0.91</td></tr>
+            <tr><td><b>LLM TTFT</b></td><td>transcript → first token</td><td class="n">—</td><td class="n">2.59</td><td class="n">7.21</td><td class="n">2.21</td></tr>
+            <tr><td><b>TTS TTFB</b></td><td>text → audio (Mac, direct)</td><td class="n">—</td><td class="n">0.44</td><td class="n">0.60</td><td class="n">0.44</td></tr>
+            <tr><td><b>Barge-in</b></td><td>"stop" → playback stopped</td><td class="n">0.3 s</td><td class="n" colspan="3" style="text-align:center">1.5 – 2.2 s (stopwatch, Nov 5)</td></tr>
+            <tr><td><b>WER</b></td><td>ASR accuracy on a test set</td><td class="n">—</td><td class="n" colspan="3" style="text-align:center">not measured</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Seconds. Targets are from the project brief. ASR p95 includes warm-up outliers right after restarts (12 s, 4–6 s).</div>
+      </div>
+    </div>
+
+    <div class="boxes">
+      <div class="panel box">
+        <h3>DEMO (run sheet: docs/demo-spiel.html)</h3>
+        <ol>
+          <li>"Watson" → "Yes? I'm listening." (also wakes on "button", "Hudson")</li>
+          <li>"What time is it in Tokyo?" → get_time_in, no guessing</li>
+          <li>"Turn the living room lights off" → lights_control</li>
+          <li>Long answer, then "Stop" → barge-in, Watson goes quiet</li>
+          <li>Classmate says "Watson, ..." → ignored (not the owner)</li>
+          <li>Slow API: 20 s timeout, 1 retry, then gpt-4o-mini answers</li>
+        </ol>
+        <div style="margin-top:3px">Natural turns throughout, no push-to-talk.</div>
+      </div>
+      <div class="panel box">
+        <h3>RESULTS</h3>
+        <div>Stage medians, end of speech → first audio (sum 4.3 s; E2E median 4.97 s):</div>
+        <div class="chart">
+          <span style="flex:0.6;background:#8a93a3">VAD</span>
+          <span style="flex:0.91;background:#1d7a86">ASR</span>
+          <span style="flex:2.21;background:#e8742a">LLM first token 2.21</span>
+          <span style="flex:0.56;background:#18233f">TTS</span>
+        </div>
+        <div class="legend"><span>0</span><span>0.6</span><span>1.5</span><span>3.7</span><span>4.3 s</span></div>
+        <div style="margin-top:5px"><b>Pi:</b> Raspberry Pi 4 Model B Rev 1.1, 4 GB, passive cooling, 48 °C, throttled=0x0, Wi-Fi.
+        <b>Mac:</b> MacBook Air M5, 16 GB; Pi to Mac RTT 6 ms. <b>Date:</b> Nov 4–6, 2026.
+        <b>Models:</b> whisper-large-v3-turbo, Kokoro-82M (am_michael), glm-5.3-flash, Silero VAD, Pipecat 1.15.</div>
+      </div>
+      <div class="panel box">
+        <h3>CHALLENGES &amp; REFERENCES</h3>
+        <ol>
+          <li><b>Echo as loud as the owner</b>, AEC gave 0–4 dB → decide by speaker identity; Watson's voice scores 0.44 vs the 0.60 gate; stranger playback rejected (0.45, 0.47).</li>
+          <li><b>Accent: "Watson" heard as "button", "Hudson"</b> → high-recall wake matcher; caught wakes in the logs 81 → 87, no new false wakes; 74/74 tests.</li>
+          <li><b>Profile overwrite locked the owner out</b> (0.52–0.58) → refresh blends 10%; profile stays at 0.994 similarity after a hostile refresh.</li>
+        </ol>
+        <div style="margin-top:2px;font-size:9px">modelcontextprotocol.io · docs.pipecat.ai · github.com/airimonda/me3-full-duplex</div>
+      </div>
+    </div>
+
+  </div>
+  <footer class="foot"><span>Machine Exercise · Full-Duplex Voice Agent on Raspberry Pi</span><span>red = deviation from the template brief · stats: 101 live turns, Pi log Nov 4–6</span><b>2-page template · 2/2</b></footer>
+</section>
+
+</body>
+</html>
