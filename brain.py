@@ -10,8 +10,9 @@ import time
 import home  # noqa: E402  (Spotify + virtual smart home)
 
 
-# v2 (Nov 6): the owner's prompt, verbatim, except one owner edit the same
-# day: city times use web_search (get_time_in is no longer offered).
+# v3 (Nov 6): the owner's prompt as pasted, with the accidental repeats
+# removed (owner's choice) and city times via web_search (owner's choice;
+# get_time_in is no longer offered). Every distinct sentence, owner's order.
 _PROMPT_OWNER = """You are a voice assistant in a live spoken conversation.
 
 Keep spoken responses natural and concise, usually one or two short sentences. Use plain text without markdown, lists, or emoji. Give more detail when the user explicitly asks. These formatting rules apply only to spoken responses.
@@ -22,13 +23,11 @@ Handle music, lights, thermostat, timers, alarms, reminders, and messages direct
 
 Only report an action as completed after its result confirms success. Distinguish completed, pending, and failed actions. If an outcome is uncertain, check its status before retrying an action that could create a duplicate.
 
-Use web_search for the current time in a requested city. Do not guess current times. Clarify ambiguous city names when necessary.
-
 Use the relevant tools for device state and personal information. Use web_search for current external information or factual uncertainty that requires verification. If verification fails, state the uncertainty briefly.
 
 Keep tool names and internal implementation details out of spoken responses. Describe outcomes and failures in everyday language.
 
-When the runtime reports an interruption, follow the user's latest completed request and corrections. Do not assume that interrupted speech canceled an action already submitted. Check its status when needed."""
+When the runtime reports an interruption, follow the user's latest completed request and corrections. Do not assume that interrupted speech canceled an action already submitted. Check its status when needed. Use web_search for the current time in a requested city. Do not guess current times. Clarify ambiguous city names when necessary."""
 
 # Runtime protocol, kept separate from the owner's text: pipecat_assistant
 # parses a reply that starts with "DELEGATE:" and hands the job to the
@@ -41,11 +40,11 @@ SYSTEM_PROMPT = _PROMPT_OWNER + _PROMPT_DELEGATE
 
 
 QUICK_TOOLS = [
-    {"type": "function", "function": {"name": "get_time", "description": "Get the current date and local time (instant, not a task).",
+    {"type": "function", "function": {"name": "get_time", "description": "Get today's date and the LOCAL time here. Only for 'what time or date is it here'. Never for news, results, events or other cities.",
                                       "parameters": {"type": "object", "properties": {}}}},
     # get_time_in removed from the talker's tools (owner, Nov 6): city times
     # go to web_search. Its handler in execute_tool stays for old callers.
-    {"type": "function", "function": {"name": "web_search", "description": "Search the web for facts, news, prices, or anything you are unsure about. Returns titles and snippets.",
+    {"type": "function", "function": {"name": "web_search", "description": "Search the web for facts, news, sports and election results, prices, the current time in another city, or anything you are unsure about. Returns titles and snippets.",
                                       "parameters": {"type": "object", "properties": {
                                           "query": {"type": "string", "description": "Search query"}}},
                                       "required": ["query"]}},
