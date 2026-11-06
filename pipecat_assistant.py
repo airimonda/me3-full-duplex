@@ -30,6 +30,11 @@ from pathlib import Path
 
 import httpx
 import mcp_client   # Pi -> Mac task MCP server (ME3_TASKS_MCP)
+try:  # fd-benchmark stage marks (no-op unless fdbench is running)
+    from fdbench_marks import mark
+except Exception:  # pragma: no cover
+    def mark(*_a, **_k):
+        pass
 import numpy as np
 from pipecat.processors.frame_processor import FrameProcessor
 
@@ -498,6 +503,7 @@ class WatsonAgent(FrameProcessor):
         return sw > so, round(sw, 3), round(so, 3)
 
     async def _commit_barge(self):
+        mark("interrupted")
         from pipecat.frames.frames import InterruptionFrame
         from pipecat.processors.frame_processor import FrameDirection
         # sustained speech that is NOT echo: commit the interruption
@@ -792,6 +798,7 @@ class WatsonAgent(FrameProcessor):
         return ack
 
     async def _respond(self, utt_pcm: bytes):
+        mark("vad_end")   # endpoint just committed this utterance
         t0 = time.perf_counter()
         gen = self.gen
         # volume gate: TV/radio clips sit far below live speech level
@@ -810,6 +817,7 @@ class WatsonAgent(FrameProcessor):
             return
         from pipecat.frames.frames import OutputAudioRawFrame
         text = await self._asr(utt_pcm)
+        mark("asr_final", text=text or "")
         t_asr = time.perf_counter()
         if not text or len(text.strip()) < 2:
             return
@@ -1006,6 +1014,8 @@ class WatsonAgent(FrameProcessor):
                     "temperature": _TALKER_TEMP}
             if use_tools:
                 body["tools"] = self.tools
+            mark("llm_request", messages=len(msgs),
+                 chars=sum(len(str(m.get("content") or "")) for m in msgs))
             stream = await self.http.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}"}, json=body)
@@ -1038,6 +1048,7 @@ class WatsonAgent(FrameProcessor):
                 if not delta:
                     continue
                 if first_token is None:
+                    mark("llm_first_token")
                     first_token = time.perf_counter()
                 buf += delta
                 reply += delta
@@ -1115,12 +1126,14 @@ class WatsonAgent(FrameProcessor):
                         args = json.loads(s["args"] or "{}")
                     except json.JSONDecodeError:
                         args = {}
+                    mark("tool_start", name=s["name"])
                     if s["name"] == "set_timer":
                         out = self._set_timer_local(int(args.get("seconds", 0)),
                                                     args.get("label", "your timer"))
                     else:
                         out = await asyncio.to_thread(self.chatbrain.execute_tool,
                                                       s["name"], args)
+                    mark("tool_end", name=s["name"])
                     self.log_event("tool", name=s["name"], args=args, out=str(out)[:80])
                     self.history.append({"role": "tool", "tool_call_id": s["id"],
                                          "content": out})
@@ -1190,10 +1203,12 @@ class WatsonAgent(FrameProcessor):
                 return None
             return r.content
         self.spoken_tokens |= _token_set(text)
+        mark("tts_request")
         r = await self.http.post(f"{SERVER}/speak",
                                  json={"text": text, "voice": TTS_VOICE})
         if r.status_code != 200:
             return None
+        mark("tts_first_audio")   # /speak returns the whole sentence at once
         return r.content
 
     async def _play(self, wav: bytes, gen: int):
@@ -1242,6 +1257,7 @@ class WatsonAgent(FrameProcessor):
         played = 0
         prebuffer = 6  # first 300 ms pushed at once: slack against loop stalls
         n_seg = 0
+        marked_out = False
         while played < len(pcm):
             if self.gen != gen:
                 # interrupted: stash the unplayed PCM so we can resume
@@ -1252,6 +1268,9 @@ class WatsonAgent(FrameProcessor):
             ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
             self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
+            if not marked_out:
+                mark("audio_out")
+                marked_out = True
             self.last_active = time.monotonic()   # speaking = activity (idle timer)
             n_seg += 1
             if n_seg > prebuffer:
