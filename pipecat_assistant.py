@@ -179,7 +179,19 @@ _GREETING_TOKENS = {"yes", "i'm", "im", "listening", "i", "am"}
 
 def wake_split(text: str) -> tuple[bool, str]:
     """(is_wake, remainder). True when the utterance OPENS with the wake word
-    or a known mishearing of it; remainder is the original text after it."""
+    or a known mishearing of it; remainder is the original text after it.
+    Repeats are stripped too ("Watson, Watson." is a bare wake, not a
+    one-word "Watson." command that the fragment rule would drop)."""
+    ok, rest = _wake_split_once(text)
+    while ok and rest:
+        again, rest2 = _wake_split_once(rest)
+        if not again:
+            break
+        rest = rest2
+    return ok, rest
+
+
+def _wake_split_once(text: str) -> tuple[bool, str]:
     toks = [(m.group(), m.end()) for m in _WAKE_TOK.finditer(text.lower())]
     if " ".join(t for t, _ in toks) in _WAKE_BARE:
         return True, ""

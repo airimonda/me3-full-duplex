@@ -36,6 +36,9 @@ WAKE = [
     ("Hudson.", ""), ("Hudson, what time is it?", "what time is it?"),
     ("out on.", ""), ("at some.", ""), ("What's your?", ""), ("ostone", ""),
     ("Otson, play music", "play music"), ("Wotson", ""), ("Utson?", ""),
+    # repeats (live Pi: "Watson, Watson." was dropped as a 1-word fragment)
+    ("Watson, Watson.", ""), ("Watson Watson Watson", ""),
+    ("Watson, button, what time is it", "what time is it"),
 ]
 NOT_WAKE = [
     "What's the time?", "What is the weather like", "Wait", "Wait a second",
