@@ -6,6 +6,7 @@ Each delegated task is a headless Hermes one-shot run in its own sandbox folder:
 The talker keeps conversing while tasks run. After each conversational turn,
 check_finished() returns newly completed tasks. Only legacy/chat.py announced them; pipecat_assistant.py does not call it yet.
 """
+import json
 import os
 import re
 import shutil
@@ -75,9 +76,27 @@ def _sandboxed(cmd, tdir):
     return cmd
 
 
+SHOW_LOG = os.environ.get("ME3_SHOW_LOG", "").strip()
+
+
 def open_url(target):
-    """Show a file or URL on the demo screen: Mac `open`; on the Pi, Chromium
-    on the HDMI desktop (DISPLAY=:0)."""
+    """Show a file or URL to the user.
+    ME3_SHOW_LOG set (the Pi): append a show event there; ui_server.py serves
+    it and mac_show.py opens it in the Mac browser (owner: whatever happens on
+    the Pi must show on the Mac). Otherwise: Mac `open`, or Chromium on :0."""
+    if SHOW_LOG:
+        ev = {"t": round(time.time(), 3)}
+        sand = os.path.realpath(TASKS_DIR) + os.sep
+        real = os.path.realpath(target) if not target.startswith("http") else ""
+        if real.startswith(sand):           # a deliverable inside ~/sandbox
+            rel = real[len(sand):].split(os.sep)
+            ev.update(kind="deliverable", task=rel[0], name="/".join(rel[1:]))
+        else:
+            ev.update(kind="url", url=target)
+        os.makedirs(os.path.dirname(os.path.expanduser(SHOW_LOG)) or ".", exist_ok=True)
+        with open(os.path.expanduser(SHOW_LOG), "a") as f:
+            f.write(json.dumps(ev) + "\n")
+        return True
     if sys.platform == "darwin":
         subprocess.Popen(["open", target])
         return True
@@ -227,7 +246,7 @@ def announcement(tid):
         return None
     thing = _thing(f.get("prompt", ""))
     if f["status"] == "done" and f["files"]:
-        return f"Done! {thing.capitalize()} is ready — take a look."
+        return f"Done! {thing[:1].upper() + thing[1:]} is ready — take a look."
     if f["status"] == "done":
         return f"Done with that. {_shorten(f['result'], 90)}"
     return f"Hmm, {thing} didn't work out — I hit a snag. Want me to give it another go?"
