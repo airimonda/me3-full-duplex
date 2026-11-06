@@ -57,6 +57,10 @@ DG_URL = "https://api.deepgram.com/v1"
 DG_ASR_MODEL = os.environ.get("ME3_DG_ASR_MODEL", "nova-3")
 # Aura-2 voice; keep it far from the owner's voice (echo rejection by identity)
 DG_VOICE = os.environ.get("ME3_DG_VOICE", "aura-2-jupiter-en")   # owner pick; sim 0.422 to owner
+# Streaming TTS (Nov 7): play Deepgram PCM as it arrives and synthesize the
+# next sentence while the current one plays. ME3_TTS_STREAM=0 restores the
+# old whole-WAV-per-sentence path (kept for A/B benchmarks).
+TTS_STREAM = os.environ.get("ME3_TTS_STREAM", "1") != "0"
 # nova-3 keyterm prompting: bias recognition toward the wake word
 DG_KEYTERMS = [k for k in os.environ.get("ME3_DG_KEYTERMS", "Watson").split(",") if k]
 DGX3 = os.environ.get("DGX3_HOST", "")         # e.g. http://10.x.x.x; empty = local backends only
@@ -362,10 +366,11 @@ def _env_key(name: str) -> str | None:
     return None
 
 
-def _dg_speak_request(text: str):
-    """(url, headers, json) for Deepgram Aura TTS -> 24 kHz mono WAV."""
+def _dg_speak_request(text: str, raw: bool = False):
+    """(url, headers, json) for Deepgram Aura TTS -> 24 kHz mono WAV, or
+    headerless 16-bit PCM when raw=True (streamed as it is generated)."""
     url = (f"{DG_URL}/speak?model={DG_VOICE}&encoding=linear16"
-           f"&sample_rate={_OUT_SR}&container=wav")
+           f"&sample_rate={_OUT_SR}&container={'none' if raw else 'wav'}")
     return url, {"Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}"}, {"text": text}
 
 
@@ -1080,6 +1085,20 @@ class WatsonAgent(FrameProcessor):
         first_token = None
 
         async def one_pass(msgs, use_tools, model=TALKER_MODEL):
+            """One streaming LLM pass. With TTS_STREAM, sentences go to a
+            _SpeechOut that synthesizes and plays them while the LLM keeps
+            streaming; the pass returns once everything said has played."""
+            nonlocal first_audio
+            out = _SpeechOut(self, gen) if TTS_STREAM else None
+            try:
+                return await one_pass_body(msgs, use_tools, model, out)
+            finally:
+                if out is not None:
+                    await out.finish()
+                    if first_audio is None and out.first_audio is not None:
+                        first_audio = out.first_audio
+
+        async def one_pass_body(msgs, use_tools, model, out):
             """One streaming LLM pass. Accumulates tool calls; emits TTS
             sentence-by-sentence; returns the tool calls (if any)."""
             nonlocal first_token, first_audio, reply, delegate_rest
@@ -1155,7 +1174,9 @@ class WatsonAgent(FrameProcessor):
                 m = _emit_point(buf)
                 if m:
                     chunk_text, buf = buf[:m + 1], buf[m + 1:]
-                    if chunk_text.strip():
+                    if chunk_text.strip() and out is not None:
+                        out.say(chunk_text.strip())
+                    elif chunk_text.strip():
                         wav = await self._speak(chunk_text.strip())
                         if wav and self.gen == gen:
                             if first_audio is None:
@@ -1164,7 +1185,9 @@ class WatsonAgent(FrameProcessor):
                             await self._play(wav, gen)
                     if len(reply.split()) >= max_words:
                         break  # bench cap: don't let playback bleed into the next trial
-            if buf.strip() and not delegate_rest and self.gen == gen:
+            if buf.strip() and not delegate_rest and self.gen == gen and out is not None:
+                out.say(buf.strip())
+            elif buf.strip() and not delegate_rest and self.gen == gen:
                 wav = await self._speak(buf.strip())
                 if wav:
                     if first_audio is None:
@@ -1320,6 +1343,36 @@ class WatsonAgent(FrameProcessor):
         mark("tts_first_audio")   # /speak returns the whole sentence at once
         return r.content
 
+    async def _speak_chunks(self, text: str):
+        """Async generator of 24 kHz 16-bit PCM pieces for one sentence.
+        Deepgram streams raw PCM as it is generated (first bytes in a few
+        hundred ms); the other backends yield the whole sentence at once."""
+        text = self.chatbrain.speakable(text)
+        if not text:
+            return
+        if ME3_TTS != "deepgram":
+            wav = await self._speak(text)
+            if wav:
+                yield _wav_pcm(wav)
+            return
+        self.spoken_tokens |= _token_set(text)
+        mark("tts_request")
+        url, hdr, body = _dg_speak_request(text, raw=True)
+        async with self.http.stream("POST", url, headers=hdr, json=body) as r:
+            if r.status_code != 200:
+                err = (await r.aread())[:120]
+                self.log_event("tts_error", backend="deepgram", status=r.status_code,
+                               body=err.decode("utf-8", "replace"))
+                return
+            first = True
+            async for piece in r.aiter_bytes():
+                if not piece:
+                    continue
+                if first:
+                    mark("tts_first_audio")
+                    first = False
+                yield piece
+
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
 
@@ -1403,6 +1456,111 @@ class WatsonAgent(FrameProcessor):
         rec = {"t": round(time.time(), 3), "event": event, **kw}
         with open(self.log_dir / "watson_log.jsonl", "a") as f:
             f.write(json.dumps(rec) + "\n")
+
+
+class _SpeechOut:
+    """Streaming speech for one LLM pass (TTS_STREAM).
+
+    say(text) queues a sentence. A synth task turns queued sentences into
+    PCM pieces in order (Deepgram streams them), and a player task pushes
+    those pieces as 50 ms frames, paced like _play_pcm. Sentence N+1 is
+    synthesized while sentence N plays, and the LLM stream is never blocked
+    by playback. On a barge (gen bumped) the player stashes every buffered,
+    unplayed sample in agent.resume_pcm, so a backchannel resume replays
+    more than the rest of the current sentence."""
+
+    FRAME = 1200      # samples per frame: 50 ms at 24 kHz
+    PREBUFFER = 6     # first 300 ms pushed at once: slack against loop stalls
+
+    def __init__(self, agent, gen: int):
+        self.a, self.gen = agent, gen
+        self.texts: asyncio.Queue = asyncio.Queue()
+        self.pcm: asyncio.Queue = asyncio.Queue()
+        self.first_audio = None
+        self._synth = asyncio.create_task(self._run_synth())
+        self._player = asyncio.create_task(self._run_player())
+
+    def say(self, text: str):
+        self.texts.put_nowait(text)
+
+    async def finish(self):
+        """Wait until everything said has played (or the turn was barged)."""
+        self.texts.put_nowait(None)
+        try:
+            await self._player
+        finally:
+            if not self._synth.done():
+                self._synth.cancel()
+
+    def _live(self) -> bool:
+        return self.a.gen == self.gen
+
+    async def _run_synth(self):
+        from contextlib import aclosing
+        try:
+            while self._live():
+                text = await self.texts.get()
+                if text is None:
+                    break
+                async with aclosing(self.a._speak_chunks(text)) as pieces:
+                    async for piece in pieces:
+                        if not self._live():
+                            break
+                        self.pcm.put_nowait(piece)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            self.a.log_event("tts_stream_error", err=repr(e)[:160])
+        finally:
+            self.pcm.put_nowait(None)
+
+    async def _run_player(self):
+        from pipecat.frames.frames import OutputAudioRawFrame
+        a = self.a
+        need = self.FRAME * 2
+        buf = bytearray()
+        done = False
+        n_seg = 0
+        while True:
+            if not self._live():
+                # barged: keep everything not yet played for a resume
+                rest = bytes(buf)
+                while not self.pcm.empty():
+                    piece = self.pcm.get_nowait()
+                    if piece:
+                        rest += piece
+                rest = rest[:len(rest) // 2 * 2]
+                if rest:
+                    a.resume_pcm = rest
+                return
+            if len(buf) < need and not done:
+                try:
+                    piece = await asyncio.wait_for(self.pcm.get(), 0.05)
+                except asyncio.TimeoutError:
+                    continue
+                if piece is None:
+                    done = True
+                else:
+                    buf += piece
+                continue
+            if not buf:
+                return   # synth finished and everything played
+            seg = bytes(buf[:need])
+            del buf[:need]
+            seg = seg[:len(seg) // 2 * 2]
+            if not seg:
+                continue
+            ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
+            a.played16 = np.concatenate([a.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
+            if self.first_audio is None:
+                self.first_audio = time.perf_counter()
+                mark("audio_out")
+            a.playing = True
+            await a.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
+            a.last_active = time.monotonic()   # speaking = activity (idle timer)
+            n_seg += 1
+            if n_seg > self.PREBUFFER:
+                await asyncio.sleep(self.FRAME / _OUT_SR * 0.92)
 
 
 def _emit_point(buf: str) -> int:
