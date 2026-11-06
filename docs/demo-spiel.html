@@ -96,11 +96,11 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     <li><span>The Watson UI runs on the Pi: open <code>http://192.168.1.80:8301</code> on the Mac (use the Pi's current IP). If it doesn't load: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_ui.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
     <li><span>On the Mac, start the viewer that opens Watson's results: <code>cd ~/me3 &amp;&amp; ./venv/bin/python mac_show.py --pi http://192.168.1.80:8301</code></span></li>
     <li><span>Wait 2 minutes after any restart. The voice model loads for about 100 s, and speech recognition is slow until it finishes.</span></li>
-    <li><span>Say <span class="voice">"Watson"</span> once. You should hear "Yes? I'm listening." in the male am_michael voice.</span></li>
-    <li><span>If Watson ignores you (log shows <code>stranger_ignored</code>), restore your voice profile, then restart Watson:</span></li>
+    <li><span>Say <span class="voice">"Watson"</span> once. You should hear "Yes? I'm listening." in the Deepgram Jupiter voice.</span></li>
+    <li><span>If Watson ignores you (log shows <code>stranger_ignored</code>), someone else holds the session: say <span class="voice">"Watson, it's me again"</span> to take it back. Only if that fails, restore your saved profile and restart Watson:</span></li>
   </ul>
   <code class="cmd">ssh watsonpi 'cp ~/me3/voice_profile_nov6_good.npy ~/me3/voice_profile.npy; pkill -f "[p]ipecat_assistant.py --mic"'</code>
-  <p class="note">Speak close to the USB mic. Watson only answers the enrolled owner, so a classmate cannot drive the main demo.</p>
+  <p class="note">Speak close to the USB mic. Watson answers only whoever holds the session; anyone takes it by saying "Watson". Say "Watson" yourself before you start.</p>
 </section>
 
 <section>
@@ -114,8 +114,8 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 <section>
   <h2><span class="t">0:30 · 60 s</span> How it works</h2>
   <div class="say">
-    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. My Mac is the brain. It runs Whisper for speech recognition and Kokoro for the voice, and it calls a fast language model, GLM 5.3 Flash, for replies and tool calls. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the result opens on my Mac the moment it's done.</p>
-    <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. Whisper hears "Watson" as "button", "Hudson" or "what's on", so the wake word is tuned to the mishearings in our own logs.</p>
+    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. Speech recognition and Watson's voice come from Deepgram, called straight from the Pi, and a fast language model, GLM 5.3 Flash, writes the replies and calls the tools. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the finished page opens on my Mac the moment it's done.</p>
+    <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. The recognizer used to hear "Watson" as "button" or "Hudson". Part of that was us: the first syllable was being cut off before it reached the recognizer. Now we keep the audio from just before you start speaking, and Deepgram is primed with the word "Watson".</p>
   </div>
 </section>
 
@@ -128,7 +128,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson"</span></dd>
         <dt>Expect</dt><dd>"Yes? I'm listening." about 2 s later.</dd>
-        <dt>Tell class</dt><dd>It also wakes on "button" and "Hudson". That's how Whisper hears my accent.</dd>
+        <dt>Tell class</dt><dd>It still accepts the old mishearings ("button", "Hudson") as a safety net for my accent.</dd>
         <dt>If it fails</dt><dd>Say it again, closer to the mic. "Watson, Watson" counts as one wake.</dd>
       </dl>
     </div>
@@ -144,10 +144,10 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     </div>
 
     <div class="step">
-      <div class="step-head"><b>2b. A fact it must not make up, while the task runs</b><span class="pill ok">web search on the Pi</span></div>
+      <div class="step-head"><b>2b. A fact it must not make up, while the task runs</b><span class="pill ok">web search, spoken answer</span></div>
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, who won the 2026 NBA finals?"</span></dd>
-        <dt>Expect</dt><dd>The search opens in the Mac's browser, and Watson answers from the results.</dd>
+        <dt>Expect</dt><dd>Watson searches the web and says the answer. Nothing opens on screen.</dd>
         <dt>Tell class</dt><dd>When the model doesn't know, it looks it up instead of guessing. The big task is still running.</dd>
         <dt>If it fails</dt><dd>Wait 7 s before repeating. Replies can take 4 to 7 s to start.</dd>
       </dl>
@@ -183,12 +183,12 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     </div>
 
     <div class="step">
-      <div class="step-head"><b>5. A stranger can't use it</b><span class="pill ok">verified Nov 6 (speaker playback)</span></div>
+      <div class="step-head"><b>5. A classmate takes over</b><span class="pill ok">tested in code; try it live once before class</span></div>
       <dl class="grid3">
-        <dt>Do</dt><dd>Ask a classmate to say <span class="voice">"Watson, what time is it?"</span> near the mic.</dd>
-        <dt>Expect</dt><dd>Silence. The log shows <code>stranger_ignored</code>.</dd>
-        <dt>Tell class</dt><dd>Saying the wake word isn't enough. Watson checks the voice against mine, and a TV or a classmate is ignored.</dd>
-        <dt>If it fails</dt><dd>If Watson answers, say so: it scored the voice as close to mine. Move on.</dd>
+        <dt>Do</dt><dd>Ask a classmate to say something without the wake word, then <span class="voice">"Watson, what time is it?"</span> Then you speak again without "Watson".</dd>
+        <dt>Expect</dt><dd>The first sentence is ignored. After "Watson", Watson answers the classmate, and now ignores you. Say <span class="voice">"Watson"</span> to take it back.</dd>
+        <dt>Tell class</dt><dd>Watson listens to one person at a time: whoever called it last. The TV or side talk can't take over, and Watson's own voice saying its name can't either.</dd>
+        <dt>If it fails</dt><dd>The classmate's "Watson, …" needs about a second of speech so Watson can learn the voice. Ask them to say a full sentence.</dd>
       </dl>
     </div>
 
@@ -208,18 +208,19 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
   <table>
     <thead><tr><th>Measure</th><th>Result</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Speech recognition, Pi to Mac</td><td class="n">0.7 – 1.2 s</td><td>live Pi log, Nov 6 (after warm-up)</td></tr>
-      <tr><td>Network round trip, Pi to Mac</td><td class="n">6 ms</td><td>ping, Nov 6</td></tr>
-      <tr><td>Time until Watson starts speaking</td><td class="n">4 – 7 s</td><td>live Pi log, Nov 6 (LLM first token)</td></tr>
-      <tr><td>Pause handling: false take-overs</td><td class="n">0 / 2 + 0 / 2</td><td>Full-Duplex-Bench, baseline #0</td></tr>
-      <tr><td>Interruptions it yielded to</td><td class="n">2 / 2</td><td>Full-Duplex-Bench, baseline #0</td></tr>
-      <tr><td>Answered speech not meant for it</td><td class="n">1 / 4</td><td>Full-Duplex-Bench, baseline #0</td></tr>
-      <tr><td>Wake word: utterances recognized as a wake</td><td class="n">87 of 324</td><td>all live logs; about 35 of the 87 are mishearings ("button" ×17)</td></tr>
+      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">4.9 s median</td><td>fdbench on the Pi, 3 runs, Nov 6 (target 4.0 s)</td></tr>
+      <tr><td>Speech recognition (Deepgram)</td><td class="n">0.93 s</td><td>fdbench on the Pi, median (target 0.8 s)</td></tr>
+      <tr><td>Language model's first word</td><td class="n">2.05 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
+      <tr><td>Voice (Deepgram) to first audio</td><td class="n">1.60 s</td><td>fdbench on the Pi, median (target 0.6 s)</td></tr>
+      <tr><td>Word error rate</td><td class="n">0.14</td><td>fdbench, 30 phrases × 3 runs (target 0.15)</td></tr>
+      <tr><td>Stops talking when interrupted</td><td class="n">0.28 / 0.76 s</td><td>Full-Duplex-Bench stop time, 2 trials</td></tr>
+      <tr><td>Answered speech not meant for it</td><td class="n">5 / 12</td><td>Full-Duplex-Bench, 3 runs pooled</td></tr>
+      <tr><td>Pi under load</td><td class="n">peak 72 °C</td><td>never throttled, no fan</td></tr>
     </tbody>
   </table>
   </div>
   <div class="say">
-    <p>Speech recognition is fast. The slow part is the language model's first word, which takes 4 to 7 seconds on a real tool call. That's the next thing to fix.</p>
+    <p>About five seconds from when you stop talking to when Watson starts. The language model's first word is the biggest piece, and the cloud voice adds about a second and a half. Streaming the voice audio instead of waiting for the whole sentence is the next fix.</p>
   </div>
 </section>
 

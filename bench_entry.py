@@ -25,9 +25,13 @@ def audio_rates() -> tuple[int, int]:
 def describe() -> dict:
     """Model versions for the results card."""
     import pipecat_assistant as pa
-    return {"ASR": "Whisper large-v3-turbo (mlx-whisper, Mac)",
+    asr = (f"Deepgram {pa.DG_ASR_MODEL} (cloud)" if pa.ME3_ASR == "deepgram"
+           else "Whisper large-v3-turbo (mlx-whisper, Mac)")
+    tts = (f"Deepgram {pa.DG_VOICE} (cloud)" if pa.ME3_TTS == "deepgram"
+           else f"Kokoro-82M {pa.TTS_VOICE} (Mac)")
+    return {"ASR": asr,
             "LLM": f"{pa.TALKER_MODEL} (OpenRouter); fallback {pa.FALLBACK_MODEL}",
-            "TTS": f"Kokoro-82M {pa.TTS_VOICE} (Mac)",
+            "TTS": tts,
             "VAD": "Silero VAD (Pipecat SileroVADAnalyzer)",
             "Harness": "Pipecat custom FrameProcessor (WatsonAgent)"}
 
