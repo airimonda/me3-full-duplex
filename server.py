@@ -21,10 +21,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from kokoro import KPipeline
 
-# Watson's voice. am_onyx scored farthest from the owner's enrolled voice
-# (resemblyzer sim 0.444 vs 0.631 for the old af_heart), so the speaker check
-# can tell Watson's own echo from the owner (2026-11-05 voice scan).
-TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_onyx")
+# Watson's voice: af_nicole (user choice, Nov 6). The speaker check tells
+# Watson's own echo from the owner by voice, so keep this far from the owner.
+# 2026-11-06 scan against the Pi profile (resemblyzer sim): am_michael 0.387,
+# am_onyx 0.388, am_eric 0.402, af_nicole 0.427 (safest female), af_heart
+# 0.556, af_jessica 0.626. Must match pipecat_assistant.py's TTS_VOICE default.
+TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "af_nicole")
 from mlx_whisper import transcribe
 
 ASR_MODEL = "mlx-community/whisper-large-v3-turbo"
