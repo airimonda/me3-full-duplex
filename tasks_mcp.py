@@ -14,7 +14,7 @@ Tools
                         the results in the Mac browser and returns snippets
 
 Run (Pi):  ~/mcp-venv/bin/python ~/me3/tasks_mcp.py   # http://127.0.0.1:8320/mcp
-Env: ME3_TASKS_MCP_PORT (8320), ME3_BROWSE_OPEN=0 to skip opening the browser.
+Env: ME3_TASKS_MCP_PORT (8320), ME3_BROWSE_OPEN=1 to also show searches on screen.
 """
 from __future__ import annotations
 
@@ -32,7 +32,8 @@ from brain import speakable  # noqa: E402
 
 PORT = int(os.environ.get("ME3_TASKS_MCP_PORT", "8320"))
 HOST = os.environ.get("ME3_TASKS_MCP_HOST", "127.0.0.1")   # same box as Watson
-BROWSE_OPEN = os.environ.get("ME3_BROWSE_OPEN", "1") != "0"
+# owner, Nov 6: searches are spoken only; nothing opens on screen
+BROWSE_OPEN = os.environ.get("ME3_BROWSE_OPEN", "0") == "1"
 
 _lock = threading.Lock()
 _announce: list[dict] = []   # finished jobs waiting for the Pi to speak them
@@ -123,8 +124,9 @@ def _build_server():
 
     @app.tool()
     def browse(query: str) -> str:
-        """Look up facts the talker does not know: opens the search in the
-        Mac browser and returns the top results as text."""
+        """Look up facts the talker does not know: returns the top web
+        results as text for Watson to answer from (nothing opens on screen
+        unless ME3_BROWSE_OPEN=1)."""
         return do_browse(query)
 
     return app
