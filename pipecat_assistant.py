@@ -56,7 +56,7 @@ ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3 | deepgram
 DG_URL = "https://api.deepgram.com/v1"
 DG_ASR_MODEL = os.environ.get("ME3_DG_ASR_MODEL", "nova-3")
 # Aura-2 voice; keep it far from the owner's voice (echo rejection by identity)
-DG_VOICE = os.environ.get("ME3_DG_VOICE", "aura-2-orion-en")
+DG_VOICE = os.environ.get("ME3_DG_VOICE", "aura-2-jupiter-en")   # owner pick; sim 0.422 to owner
 # nova-3 keyterm prompting: bias recognition toward the wake word
 DG_KEYTERMS = [k for k in os.environ.get("ME3_DG_KEYTERMS", "Watson").split(",") if k]
 DGX3 = os.environ.get("DGX3_HOST", "")         # e.g. http://10.x.x.x; empty = local backends only
