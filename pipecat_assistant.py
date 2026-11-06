@@ -982,7 +982,9 @@ class WatsonAgent(FrameProcessor):
                                total_s=round(time.perf_counter() - t0, 3))
                 return
         self.spoken_tokens = set()   # new reply: only its own words are echo
-        self.history.append({"role": "user", "content": text})
+        user_msg = {"role": "user", "content": text}
+        self.history.append(user_msg)
+        ft_marked = [False]   # one llm_first_token mark per turn
         # cap context: talker first-token grows with history (glm-5.3-flash:
         # 1.1-2.0 s at 2 msgs vs 2.0-3.7 s at 54; bench spikes hit 7-10 s and
         # missed the 8 s turn window). Keep system + the last _HIST_KEEP
@@ -1037,6 +1039,9 @@ class WatsonAgent(FrameProcessor):
                         self.log_event("llm_bad_line", line=data[:200])
                         self._bad_logged += 1
                     continue
+                if not ft_marked[0] and (d.get("tool_calls") or d.get("content")):
+                    mark("llm_first_token")
+                    ft_marked[0] = True
                 for tc in d.get("tool_calls") or []:
                     i = tc.get("index", 0)
                     slot = calls.setdefault(i, {"id": "", "name": "", "args": ""})
@@ -1048,7 +1053,6 @@ class WatsonAgent(FrameProcessor):
                 if not delta:
                     continue
                 if first_token is None:
-                    mark("llm_first_token")
                     first_token = time.perf_counter()
                 buf += delta
                 reply += delta
@@ -1160,6 +1164,7 @@ class WatsonAgent(FrameProcessor):
                 self.barged = False
             total = time.perf_counter() - t0
             if reply.strip():
+                self._collapse_tools(user_msg)
                 self.history.append({"role": "assistant", "content": reply})
             ft = max(0.0, (first_token or t_asr) - t0)
             fa = max(0.0, (first_audio if first_audio is not None else total) - t0)
@@ -1275,6 +1280,20 @@ class WatsonAgent(FrameProcessor):
             n_seg += 1
             if n_seg > prebuffer:
                 await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
+
+    def _collapse_tools(self, user_msg):
+        """Drop this turn's tool-call and tool-result messages once the turn
+        has its final spoken reply: later turns only need what was said. A
+        web search alone is ~1,000 characters that used to ride along for
+        the next 12 messages."""
+        idx = next((i for i, m in enumerate(self.history) if m is user_msg), None)
+        if idx is None:
+            return
+        end = next((j for j in range(idx + 1, len(self.history))
+                    if self.history[j].get("role") == "user"), len(self.history))
+        keep = [m for m in self.history[idx + 1:end]
+                if m.get("role") != "tool" and not m.get("tool_calls")]
+        self.history[idx + 1:end] = keep
 
     def log_event(self, event: str, **kw):
         rec = {"t": round(time.time(), 3), "event": event, **kw}

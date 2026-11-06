@@ -10,31 +10,21 @@ import time
 import home  # noqa: E402  (Spotify + virtual smart home)
 
 
-# v3 (Nov 6): the owner's prompt as pasted, with the accidental repeats
-# removed (owner's choice) and city times via web_search (owner's choice;
-# get_time_in is no longer offered). Every distinct sentence, owner's order.
-_PROMPT_OWNER = """You are a voice assistant in a live spoken conversation.
+# v4 (Nov 6, owner-approved): short version of the owner's v3 prompt, same
+# rules in the same order (~230 tokens vs ~540). Measured: prompt size moves
+# glm-5.3-flash TTFT by only ~0.2-0.5 s; it was trimmed for context hygiene.
+_PROMPT_OWNER = """You are Watson, a voice assistant in a live spoken conversation. Reply in one or two short spoken sentences, plain text, no markdown or emoji; give more detail only when asked.
+When a request is clear, act with the right tool without offering first. If a needed detail is missing, ask one short question.
+Handle music, lights, thermostat, timers, alarms, reminders and messages yourself with their tools.
+Say an action is done only after the tool confirms it; say clearly if it is pending or failed.
+For news, facts you are unsure of, and the time in other cities, use web_search; never guess. If the search doesn't settle it, say so briefly.
+Never mention tools or internal details.
+After an interruption, follow the user's latest request; an action already submitted still stands unless they cancel it."""
 
-Keep spoken responses natural and concise, usually one or two short sentences. Use plain text without markdown, lists, or emoji. Give more detail when the user explicitly asks. These formatting rules apply only to spoken responses.
-
-When the user clearly requests an action and the required details are available, call the appropriate tool without offering to do it first. If a required detail is missing or an ambiguity would change the action, ask one short, natural clarifying question. Use established conversation context and configured defaults where appropriate.
-
-Handle music, lights, thermostat, timers, alarms, reminders, and messages directly through their available tools. Do not delegate these tasks. Follow the tool schemas and use only supported capabilities.
-
-Only report an action as completed after its result confirms success. Distinguish completed, pending, and failed actions. If an outcome is uncertain, check its status before retrying an action that could create a duplicate.
-
-Use the relevant tools for device state and personal information. Use web_search for current external information or factual uncertainty that requires verification. If verification fails, state the uncertainty briefly.
-
-Keep tool names and internal implementation details out of spoken responses. Describe outcomes and failures in everyday language.
-
-When the runtime reports an interruption, follow the user's latest completed request and corrections. Do not assume that interrupted speech canceled an action already submitted. Check its status when needed. Use web_search for the current time in a requested city. Do not guess current times. Clarify ambiguous city names when necessary."""
-
-# Runtime protocol, kept separate from the owner's text: pipecat_assistant
-# parses a reply that starts with "DELEGATE:" and hands the job to the
-# background agent (task MCP server). Without it no big task is delegated.
+# Runtime protocol: pipecat_assistant parses a reply that starts with
+# "DELEGATE:" and hands the job to the background agent (task MCP server).
 _PROMPT_DELEGATE = """
-
-Big jobs (building a website, app or game, research write-ups, files, anything that takes minutes) run on a background agent. Hand one over by replying with the tag DELEGATE: followed by a one-line restatement of the request, for example: DELEGATE: a one-page website about Tokyo trips. The tag is machine-read and never spoken. Keep talking with the user while it runs; you will announce it when it is done."""
+Big jobs (sites, apps, research, files) go to the background agent: reply DELEGATE: <one-line request>. Never speak the tag. If the job has no topic yet ("build me a website"), ask what it should be about first."""
 
 SYSTEM_PROMPT = _PROMPT_OWNER + _PROMPT_DELEGATE
 
@@ -52,13 +42,13 @@ QUICK_TOOLS = [
                                       "parameters": {"type": "object", "properties": {
                                           "seconds": {"type": "integer"},
                                           "label": {"type": "string"}}, "required": ["seconds"]}}},
-    {"type": "function", "function": {"name": "spotify_play", "description": "Play music on Spotify. Pass a song, artist, genre or mood as the query.",
-                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "spotify_pause", "description": "Pause the music.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_next", "description": "Skip to the next track.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_prev", "description": "Go back to the previous track.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_volume", "description": "Set the music volume (0-100).",
-                                      "parameters": {"type": "object", "properties": {"percent": {"type": "integer"}}, "required": ["percent"]}}},
+    # one schema instead of five spotify_* (tool schemas go out on every call)
+    {"type": "function", "function": {"name": "music", "description": "Control music: play a song, artist, genre or mood; pause; next; previous; or set volume.",
+                                      "parameters": {"type": "object", "properties": {
+                                          "action": {"type": "string", "enum": ["play", "pause", "next", "previous", "volume"]},
+                                          "query": {"type": "string", "description": "what to play (action=play)"},
+                                          "percent": {"type": "integer", "description": "0-100 (action=volume)"}},
+                                      "required": ["action"]}}},
     {"type": "function", "function": {"name": "lights_control", "description": "Control the smart lights: turn on/off, set brightness percent or color.",
                                       "parameters": {"type": "object", "properties": {
                                           "light": {"type": "string", "description": "Light name, e.g. living room"},
@@ -154,6 +144,17 @@ def execute_tool(name, args):
         # timers must speak through the caller's own audio path:
         # pipecat_assistant intercepts set_timer (_set_timer_local)
         return "set_timer must be handled by the voice pipeline."
+    if name == "music":
+        act = (args.get("action") or "").lower()
+        target = {"play": "spotify_play", "pause": "spotify_pause", "next": "spotify_next",
+                  "previous": "spotify_prev", "prev": "spotify_prev",
+                  "volume": "spotify_volume"}.get(act)
+        if not target:
+            return f"Unknown music action {act!r}."
+        sub = {"query": args.get("query", "")} if target == "spotify_play" else (
+            {"percent": args.get("percent", 50)} if target == "spotify_volume" else {})
+        return home.do_tool(target, sub)
+    # spotify_* stay callable directly (the dashboard's buttons use them)
     if name in ("spotify_play", "spotify_pause", "spotify_next", "spotify_prev",
                 "spotify_volume", "lights_control", "thermostat_set", "set_alarm",
                 "add_reminder", "list_items", "contact_message"):
