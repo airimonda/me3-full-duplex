@@ -42,12 +42,14 @@ footer.foot { position: absolute; left: 64px; right: 64px; bottom: 10px; border-
 footer.foot b { color: var(--muted); }
 /* page 1 */
 .p1 { display: grid; grid-template-columns: 640px 1fr; grid-template-rows: auto 1fr; gap: 6px 26px; height: 100%; }
-.diag svg { display: block; width: 580px; height: 256px; }
+.diag svg { display: block; width: 520px; height: 229px; }
 .bar { background: var(--navy); color: #fff; font-family: var(--mono); font-size: 10.5px; text-align: center; padding: 5px 6px; border-radius: 4px; margin-top: 5px; }
 .barge { color: var(--orange); font-family: var(--mono); font-weight: 700; font-size: 10px; text-align: center; margin-top: 3px; }
-.prompt { padding: 6px 10px; font-family: var(--mono); font-size: 8.9px; line-height: 1.34; }
-.prompt .h { color: var(--teal); font-weight: 700; margin-bottom: 4px; font-size: 10px; }
-.prompt .x { color: var(--muted); font-family: var(--font); font-size: 9.2px; margin-top: 3px; line-height: 1.3; }
+.prompt { padding: 5px 9px; font-family: var(--font); font-size: 7.55px; line-height: 1.27; }
+.prompt .h { color: var(--teal); font-weight: 700; margin-bottom: 2px; font-size: 9px; font-family: var(--mono); }
+.prompt p { margin: 0 0 2px; }
+.prompt p.dl { color: var(--teal); }
+.prompt .x { color: var(--muted); font-size: 7.4px; margin-top: 2px; line-height: 1.25; }
 .ctx { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .ctx h3 { margin: 0 0 4px; color: var(--teal); font-size: 11.5px; }
 .ctx ul.dash { font-size: 9.8px; gap: 1px; line-height: 1.3; }
@@ -185,7 +187,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
 
       <!-- right of diagram -->
       <div>
-        <ul class="dash" style="font-size:11px; gap:5px; margin-top:28px">
+        <ul class="dash" style="font-size:9.6px; gap:2px; margin-top:22px; line-height:1.3">
           <li>Mic → VAD on the RPi → <b>ASR on the Mac</b> → agent on the RPi → <b>TTS on the Mac</b> → speaker on the RPi.</li>
           <li>Harness: <b>Pipecat 1.15</b>, one FrameProcessor (WatsonAgent). Stock transports only; the same agent runs the live mic and the benchmark socket.</li>
           <li>LLM: <b>z-ai/glm-5.3-flash</b> via OpenRouter, streaming with function calling. 20 s read timeout, one retry, then <b>gpt-4o-mini</b>.</li>
@@ -199,18 +201,11 @@ tr:nth-child(even) td { background: #f5f7fa; }
 
       <!-- 2 PROMPT -->
       <div>
-        <div class="sec"><span class="num">2</span><h2>PROMPT</h2><span class="hint">in the repo, versioned: brain.py v3 (Nov 6, owner-written)</span></div>
+        <div class="sec"><span class="num">2</span><h2>PROMPT</h2><span class="hint">in the repo, versioned: brain.py v3 (Nov 6)</span></div>
         <div class="panel prompt">
-          <div class="h">SYSTEM PROMPT (brain.py v3) · excerpt</div>
-          You are a voice assistant in a live spoken conversation. Keep spoken<br>
-          responses natural and concise, usually one or two short sentences.<br>
-          When the user clearly requests an action and the required details are<br>
-          available, call the appropriate tool without offering to do it first.<br>
-          Only report an action as completed after its result confirms success.<br>
-          Use web_search for current external information or factual uncertainty.<br>
-          Keep tool names and internal implementation details out of spoken<br>
-          responses. + DELEGATE: big jobs go to the background agent.
-          <div class="x">Barge-in is enforced in code, not the prompt. A code filter strips paths, file names and URLs from everything Watson says. Bench mode appends an addressed-speech rule and a 35-word cap.</div>
+          <div class="h">SYSTEM PROMPT (brain.py v3) · full text, verbatim</div>
+          <p>You are a voice assistant in a live spoken conversation.</p><p>Keep spoken responses natural and concise, usually one or two short sentences. Use plain text without markdown, lists, or emoji. Give more detail when the user explicitly asks. These formatting rules apply only to spoken responses.</p><p>When the user clearly requests an action and the required details are available, call the appropriate tool without offering to do it first. If a required detail is missing or an ambiguity would change the action, ask one short, natural clarifying question. Use established conversation context and configured defaults where appropriate.</p><p>Handle music, lights, thermostat, timers, alarms, reminders, and messages directly through their available tools. Do not delegate these tasks. Follow the tool schemas and use only supported capabilities.</p><p>Only report an action as completed after its result confirms success. Distinguish completed, pending, and failed actions. If an outcome is uncertain, check its status before retrying an action that could create a duplicate.</p><p>Use the relevant tools for device state and personal information. Use web_search for current external information or factual uncertainty that requires verification. If verification fails, state the uncertainty briefly.</p><p>Keep tool names and internal implementation details out of spoken responses. Describe outcomes and failures in everyday language.</p><p>When the runtime reports an interruption, follow the user&#x27;s latest completed request and corrections. Do not assume that interrupted speech canceled an action already submitted. Check its status when needed. Use web_search for the current time in a requested city. Do not guess current times. Clarify ambiguous city names when necessary.</p><p class="dl">Big jobs (building a website, app or game, research write-ups, files, anything that takes minutes) run on a background agent. Hand one over by replying with the tag DELEGATE: followed by a one-line restatement of the request, for example: DELEGATE: a one-page website about Tokyo trips. The tag is machine-read and never spoken. Keep talking with the user while it runs; you will announce it when it is done.</p>
+          <div class="x">Owner-written (paragraphs 1–8). The last paragraph (teal) is the runtime DELEGATE protocol the voice loop parses. Barge-in is enforced in code; a filter strips paths, file names and URLs from everything Watson says. Bench mode appends an addressed-speech rule and a 35-word cap.</div>
         </div>
       </div>
 
