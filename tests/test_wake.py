@@ -32,6 +32,13 @@ WAKE = [
     ("That's on.", ""), ("Thats on, what time is it", "what time is it"),
     ("that sun.", ""), ("That sun, lights off", "lights off"),   # live Pi, Nov 6
     ("Hatson", ""), ("Whatsun?", ""),
+    # Filipino-accented "Watson", real misses from the Nov 6 Pi logs
+    ("Hudson.", ""), ("Hudson, what time is it?", "what time is it?"),
+    ("out on.", ""), ("at some.", ""), ("What's your?", ""), ("ostone", ""),
+    ("Otson, play music", "play music"), ("Wotson", ""), ("Utson?", ""),
+    # repeats (live Pi: "Watson, Watson." was dropped as a 1-word fragment)
+    ("Watson, Watson.", ""), ("Watson Watson Watson", ""),
+    ("Watson, button, what time is it", "what time is it"),
 ]
 NOT_WAKE = [
     "What's the time?", "What is the weather like", "Wait", "Wait a second",
@@ -41,6 +48,11 @@ NOT_WAKE = [
     "That's not right", "That's all", "That's the one", "What's up",
     "Hats off to you", "Person of interest", "Lesson one", "Boston weather",
     "Thanks a lot", "Lights off", "first.", "What's your name?",
+    # accent rules must not swallow common openers
+    "At some point remind me", "Out on the porch", "What's your favorite song",
+    "London calling", "Boston weather today", "Ouch that hurts", "Other one",
+    "Autumn is here", "Austin Texas", "Under the bed", "Order a pizza",
+    "Upstairs lights off", "Outside temperature",
 ]
 
 fails = 0
