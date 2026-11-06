@@ -331,6 +331,8 @@ def _to_in_sr(samples: np.ndarray, sr: int) -> np.ndarray:
                      np.arange(len(samples)), samples).astype(np.int16)
 _ENDPOINT_MS = 600
 _MIN_UTT_MS = 250
+_PREROLL_MS = int(os.environ.get("ME3_PREROLL_MS", "400"))   # audio kept before VAD onset
+_PREROLL_BYTES = _IN_SR * 2 * _PREROLL_MS // 1000
 _BARGE_MS = 150
 _SPEAK_THRESH = 0.5
 
@@ -420,6 +422,7 @@ class WatsonAgent(FrameProcessor):
             confidence=0.5, start_secs=0.1, stop_secs=0.6, min_volume=0.004))
         self.vad.set_sample_rate(_IN_SR)
         self.buf = bytearray()
+        self.preroll = bytearray()      # last _PREROLL_MS of quiet audio (onset pre-roll)
         self.in_speech = False
         self.silence_ms = 0.0
         self.speech_ms = 0.0
@@ -710,6 +713,12 @@ class WatsonAgent(FrameProcessor):
         if self.play_mic:
             self.play_mic = bytearray()
         if state != VADState.QUIET:
+            if not self.in_speech:
+                # pre-roll: the VAD fires ~100-300 ms into a soft onset, so
+                # the "Wat" of "Watson" was cut off (Deepgram heard "Watson
+                # lights off" as "Sunlight's off", Nov 6)
+                self.buf.extend(self.preroll)
+                self.preroll = bytearray()
             self.buf.extend(pcm)
             self.in_speech = True
             self.speech_ms += ms
@@ -728,6 +737,10 @@ class WatsonAgent(FrameProcessor):
         else:
             # idle: keep learning the ambient noise floor
             self.ambient_rms = 0.9 * self.ambient_rms + 0.1 * rms
+            # keep the last _PREROLL_MS of quiet audio for the next onset
+            self.preroll.extend(pcm)
+            if len(self.preroll) > _PREROLL_BYTES:
+                del self.preroll[:len(self.preroll) - _PREROLL_BYTES]
             # finished background tasks: announce once per second check,
             # only while nobody is talking and no reply is in flight
             now = time.monotonic()
