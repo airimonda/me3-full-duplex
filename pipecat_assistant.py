@@ -132,7 +132,15 @@ _WAKE_WORDS = {
     "watson", "watsons", "wattson", "watsun", "whatson", "watsen", "waston",
     "wattsun", "watsom", "wharton", "walton", "button", "orton",
     "batson", "matson", "watton", "wasson", "watts",
+    # Filipino-accented "Watson" (owner, Nov 6 logs): soft or dropped /w/,
+    # rounded first vowel -> "Hudson", "otson"
+    "hudson", "otson", "utson", "atson", "wotson", "watsong",
 }
+# whole-utterance-only wake forms: too common as sentence openers ("At some
+# point...", "What's your name?") to count as a prefix, but alone they were
+# the owner calling Watson (Nov 6 logs)
+_WAKE_BARE = {"at some", "out on", "what's your", "whats your", "ostone",
+              "at son", "out son", "hot son"}
 _WAKE_PAIRS = {
     ("watch", "on"), ("what's", "on"), ("whats", "on"), ("what", "son"),
     ("what", "sun"), ("watts", "on"), ("watt", "son"), ("wat", "son"),
@@ -154,6 +162,11 @@ def _wake_fuzzy(word: str) -> bool:
     # Whisper swaps the opening consonant ("that sun", "that's on", "what son"):
     # compare what follows it against "atson"
     core = re.sub(r"^[^aeiou]+", "", w)
+    # Filipino-accented English rounds Watson's first vowel ("Hudson",
+    # "otson"): accept o/u + t/d + s + vowel + n only. A ratio is too loose
+    # here ("Boston" -> aston, "out on" -> auton both score 0.8).
+    if core[:1] in ("o", "u"):
+        return re.fullmatch(r"[ou][td]{1,2}s[aeiou]ng?", core) is not None
     return (core.startswith("a")
             and difflib.SequenceMatcher(None, core, "atson").ratio() >= _WAKE_FUZZ)
 
@@ -168,6 +181,8 @@ def wake_split(text: str) -> tuple[bool, str]:
     """(is_wake, remainder). True when the utterance OPENS with the wake word
     or a known mishearing of it; remainder is the original text after it."""
     toks = [(m.group(), m.end()) for m in _WAKE_TOK.finditer(text.lower())]
+    if " ".join(t for t, _ in toks) in _WAKE_BARE:
+        return True, ""
     starts = [0, 1] if toks and toks[0][0] in _WAKE_LEAD else [0]
     # order matters: exact pair ("watts on") > single word ("watson is" must
     # not consume "is") > fuzzy pair ("what sin")
