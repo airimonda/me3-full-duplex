@@ -147,8 +147,21 @@ _WAKE_TOK = re.compile(r"[a-z0-9']+")
 def _wake_fuzzy(word: str) -> bool:
     import difflib
     w = word.replace("'", "")
-    return (4 <= len(w) <= 9
-            and difflib.SequenceMatcher(None, w, "watson").ratio() >= _WAKE_FUZZ)
+    if not 4 <= len(w) <= 9:
+        return False
+    if difflib.SequenceMatcher(None, w, "watson").ratio() >= _WAKE_FUZZ:
+        return True
+    # Whisper swaps the opening consonant ("that sun", "that's on", "what son"):
+    # compare what follows it against "atson"
+    core = re.sub(r"^[^aeiou]+", "", w)
+    return (core.startswith("a")
+            and difflib.SequenceMatcher(None, core, "atson").ratio() >= _WAKE_FUZZ)
+
+
+# a pause after the wake word splits "Watson ... lights off" into two
+# utterances (600 ms endpoint): the one right after a bare wake is addressed
+_WAKE_FOLLOW_S = 8.0
+_GREETING_TOKENS = {"yes", "i'm", "im", "listening", "i", "am"}
 
 
 def wake_split(text: str) -> tuple[bool, str]:
@@ -346,6 +359,7 @@ class WatsonAgent(FrameProcessor):
         self.announce_task = None
         # idle state (mic mode): last accepted turn / playback / wake word
         self.last_active = time.monotonic()
+        self.wake_follow_until = 0.0    # bare wake: next utterance is addressed
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
@@ -718,8 +732,17 @@ class WatsonAgent(FrameProcessor):
                        lvl_db=round(lvl_db, 1))
         # ghost filter: Whisper's classic hallucinations on short bursts / TV
         # audio — drop before they count as speech or touch the voice profile
-        norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
         is_wake, wake_rest = wake_split(text)
+        norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
+        followup = False
+        is_wake, wake_rest = wake_split(text)
+        # (ghosts, fillers and the echo of our own greeting don't use it up)
+        if (not is_wake and time.monotonic() < self.wake_follow_until
+                and norm not in WHISPER_GHOSTS and not _token_set(text) <= FILLERS
+                and not _token_set(text) <= _GREETING_TOKENS):
+            is_wake, wake_rest, followup = True, text.strip(), True
+            self.wake_follow_until = 0.0
+            self.log_event("wake_followup", user=text)
         no_wake = not is_wake
         # bare stop after a keyword barge ("stop", "Watson, wait"): the
         # interruption itself was the request — stay quiet, drop the remainder
@@ -763,6 +786,7 @@ class WatsonAgent(FrameProcessor):
         # wake-word handling: bare "Watson" -> greet; "Watson, ..." -> strip the
         # wake word and ALWAYS answer (never let the SILENT gate eat a command)
         if is_wake and not (_token_set(wake_rest) - FILLERS):
+            self.wake_follow_until = time.monotonic() + _WAKE_FOLLOW_S
             wav = await self._speak("Yes? I'm listening.")
             if wav:
                 self.playing = True
@@ -789,7 +813,7 @@ class WatsonAgent(FrameProcessor):
             # wake-prefixed: count the whole utterance ("Watson, lights off"
             # is addressed and long enough to embed, not a fragment)
             words = (heard if is_wake else text).split()
-            fragment = len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text)
+            fragment = not followup and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
                 # mic mode: a fragment ("we", "okay") must not spawn a response —

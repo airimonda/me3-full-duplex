@@ -30,12 +30,17 @@ WAKE = [
     ("Wason, set a timer", "set a timer"),
     ("What son, stop", "stop"),
     ("That's on.", ""), ("Thats on, what time is it", "what time is it"),
+    ("that sun.", ""), ("That sun, lights off", "lights off"),   # live Pi, Nov 6
+    ("Hatson", ""), ("Whatsun?", ""),
 ]
 NOT_WAKE = [
     "What's the time?", "What is the weather like", "Wait", "Wait a second",
     "Watch this", "Was it raining yesterday", "Washing machine is done",
     "Weather in Manila", "Wilson called me", "Water the plants",
     "I asked Watson earlier", "Turn off the lights", "Reason with me",
+    "That's not right", "That's all", "That's the one", "What's up",
+    "Hats off to you", "Person of interest", "Lesson one", "Boston weather",
+    "Thanks a lot", "Lights off", "first.", "What's your name?",
 ]
 
 fails = 0
@@ -105,6 +110,17 @@ async def main():
     if time.monotonic() - agent.last_active > 5:
         fails += 1
         print("FAIL bare wake did not reset the idle timer")
+    # live Pi, Nov 6: "Watson <pause> lights off" arrives as two utterances.
+    # After a bare wake, the next real utterance is addressed even if short;
+    # a ghost or our own greeting echo in between doesn't use the window up.
+    # (awake, a 3-word greeting echo is answered like any sentence — the point
+    # is that it leaves the follow-up window armed)
+    for text, want in [("Thank you.", None), ("Yes, I'm listening.", "Yes, I'm listening."),
+                       ("lights off.", "lights off."), ("lights off.", None)]:
+        got = await run_case(agent, text, False)
+        if got != want:
+            fails += 1
+            print(f"FAIL follow-up {text!r}: answered {got!r}, want {want!r}")
 
     ev = [json.loads(l)["event"] for l in open(d / "watson_log.jsonl")]
     for need in ("ignored_idle", "woke", "greeted"):
