@@ -125,11 +125,11 @@ tr:nth-child(even) td { background: #f5f7fa; }
           <text x="75" y="180" font-size="9.6" text-anchor="middle" font-weight="700">tasks_mcp.py (our MCP)</text>
           <text x="75" y="192" font-size="8" text-anchor="middle" fill="#5d6676">streamable HTTP :8320</text>
           <text x="20" y="206" font-size="8.2">• submit_task · finished</text>
-          <text x="20" y="218" font-size="8.2">• browse → Chromium</text>
+          <text x="20" y="218" font-size="8.2">• browse (web search)</text>
           <text x="20" y="232" font-size="8.2" font-weight="700">→ pi.dev agent</text>
           <text x="20" y="244" font-size="8" fill="#5d6676">bwrap: writes ~/sandbox</text>
-          <text x="20" y="256" font-size="8" fill="#5d6676">only; opens result on</text>
-          <text x="20" y="266" font-size="8" fill="#5d6676">the HDMI screen</text>
+          <text x="20" y="256" font-size="8" fill="#5d6676">only; result shows on</text>
+          <text x="20" y="266" font-size="8" fill="#5d6676">the Mac (Watson UI)</text>
 
           <!-- Pi arrows -->
           <line x1="75" y1="58" x2="75" y2="71" stroke="#18233f" marker-end="url(#a)"/>
@@ -189,7 +189,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
           <li>Mic → VAD on the RPi → <b>ASR on the Mac</b> → agent on the RPi → <b>TTS on the Mac</b> → speaker on the RPi.</li>
           <li>Harness: <b>Pipecat 1.15</b>, one FrameProcessor (WatsonAgent). Stock transports only; the same agent runs the live mic and the benchmark socket.</li>
           <li>LLM: <b>z-ai/glm-5.3-flash</b> via OpenRouter, streaming with function calling. 20 s read timeout, one retry, then <b>gpt-4o-mini</b>.</li>
-          <li><b>Task MCP on the RPi:</b> tasks_mcp.py (streamable HTTP) takes big jobs and web lookups. Jobs run the <b>pi.dev</b> agent under bubblewrap, writing only in ~/sandbox; the result opens on the Pi's screen and Watson announces it at the next pause, never reading a path.</li>
+          <li><b>Task MCP on the RPi:</b> tasks_mcp.py (streamable HTTP) takes big jobs and web lookups. Jobs run the <b>pi.dev</b> agent under bubblewrap, writing only in ~/sandbox; the Watson UI (ui_server.py, also on the Pi) serves the result and the Mac opens it; Watson announces it at the next pause, never reading a path.</li>
           <li><span class="dev">Deviation from the brief:</span> ASR and TTS are HTTP services on a MacBook Air M5, not MCP servers on the RPi. Whisper large-v3-turbo does not run in real time on a Pi 4. Quick tools (lights, timers) are in-process calls.</li>
           <li>Second MCP built by us: <b>tts_mcp.py</b> (EfficientSpeech Tiny, tools <span class="mono">speak</span>, <span class="mono">health</span>). Tested on the Mac; not in the live loop.</li>
           <li>Barge-in cancels playback (InterruptionFrame) and the LLM stream (generation counter). The unplayed audio is stashed so a "yeah" backchannel can resume it.</li>
@@ -267,7 +267,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
           <tr><td><b>LLM</b></td><td>WatsonAgent (Pipecat harness), OpenAI-compatible streaming</td><td>function calling, 15 tools</td><td>z-ai/glm-5.3-flash; fallback openai/gpt-4o-mini</td><td>Cloud (OpenRouter); 20 s read timeout, 1 retry, then fallback</td></tr>
           <tr><td><b>VAD</b></td><td>in-process</td><td>SileroVADAnalyzer(frames)</td><td>Silero VAD (ONNX)</td><td>RPi on-device, 16 kHz mono; start 0.1 s, stop 0.6 s</td></tr>
           <tr><td><b>Speaker ID</b></td><td>in-process (speakerid.py)</td><td>similarity(pcm, profile)</td><td>resemblyzer (GE2E)</td><td>RPi; owner gate ≥ 0.60, echo check vs Watson's voice (0.44)</td></tr>
-          <tr><td><b>Tasks</b></td><td><b>tasks_mcp.py</b> / streamable HTTP :8320 (MCP)</td><td>submit_task(request), list_tasks(), finished(), browse(query)</td><td>pi.dev 1.5 agent on glm-5.3-flash; search: DuckDuckGo (ddgs)</td><td>RPi; agent under bubblewrap in ~/sandbox; result opens in Chromium; 10 s for a one-page site</td></tr>
+          <tr><td><b>Tasks</b></td><td><b>tasks_mcp.py</b> / streamable HTTP :8320 (MCP)</td><td>submit_task(request), list_tasks(), finished(), browse(query)</td><td>pi.dev 1.5 agent on glm-5.3-flash; search: DuckDuckGo (ddgs)</td><td>RPi; agent under bubblewrap in ~/sandbox; result opens on the Mac via the Watson UI; 10 s for a one-page site</td></tr>
           <tr><td><b>Quick tools</b></td><td>in-process <span class="mono">brain.execute_tool</span> <span class="dev">(not MCP)</span></td><td>get_time, web_search, lights, thermostat, timers, alarms, reminders, spotify_*</td><td>n/a</td><td>RPi; home state is virtual (JSON); web_search goes through browse</td></tr>
         </tbody>
       </table>

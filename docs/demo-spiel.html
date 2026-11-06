@@ -93,6 +93,8 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     <li><span>The Mac and the Pi are on the same network. Check the Mac server: <code>curl -s localhost:8300/health</code> should print 200-style JSON.</span></li>
     <li><span>Watson is running on the Pi: <code>ssh watsonpi 'pgrep -fl pipecat_assistant'</code> shows one process. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_live.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
     <li><span>The task server is running on the Pi: <code>ssh watsonpi 'pgrep -fl tasks_mcp'</code>. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_tasks_mcp.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>The Watson UI runs on the Pi: open <code>http://192.168.1.80:8301</code> on the Mac (use the Pi's current IP). If it doesn't load: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_ui.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>On the Mac, start the viewer that opens Watson's results: <code>cd ~/me3 &amp;&amp; ./venv/bin/python mac_show.py --pi http://192.168.1.80:8301</code></span></li>
     <li><span>Wait 2 minutes after any restart. The voice model loads for about 100 s, and speech recognition is slow until it finishes.</span></li>
     <li><span>Say <span class="voice">"Watson"</span> once. You should hear "Yes? I'm listening." in the male am_michael voice.</span></li>
     <li><span>If Watson ignores you (log shows <code>stranger_ignored</code>), restore your voice profile, then restart Watson:</span></li>
@@ -112,7 +114,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 <section>
   <h2><span class="t">0:30 · 60 s</span> How it works</h2>
   <div class="say">
-    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. My Mac is the brain. It runs Whisper for speech recognition and Kokoro for the voice, and it calls a fast language model, GLM 5.3 Flash, for replies and tool calls. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and opens the result on screen when it's done.</p>
+    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. My Mac is the brain. It runs Whisper for speech recognition and Kokoro for the voice, and it calls a fast language model, GLM 5.3 Flash, for replies and tool calls. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the result opens on my Mac the moment it's done.</p>
     <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. Whisper hears "Watson" as "button", "Hudson" or "what's on", so the wake word is tuned to the mishearings in our own logs.</p>
   </div>
 </section>
@@ -145,7 +147,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <div class="step-head"><b>2b. A fact it must not make up, while the task runs</b><span class="pill ok">web search on the Pi</span></div>
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, who won the 2026 NBA finals?"</span></dd>
-        <dt>Expect</dt><dd>The search opens in the Pi's browser, and Watson answers from the results.</dd>
+        <dt>Expect</dt><dd>The search opens in the Mac's browser, and Watson answers from the results.</dd>
         <dt>Tell class</dt><dd>When the model doesn't know, it looks it up instead of guessing. The big task is still running.</dd>
         <dt>If it fails</dt><dd>Wait 7 s before repeating. Replies can take 4 to 7 s to start.</dd>
       </dl>
@@ -164,7 +166,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     <div class="step">
       <div class="step-head"><b>3b. The big task finishes</b><span class="pill ok">verified on the Pi Nov 6</span></div>
       <dl class="grid3">
-        <dt>Expect</dt><dd>At the next quiet moment: "Done! The Manila street food website is ready — take a look." The page opens on the Pi's screen by itself.</dd>
+        <dt>Expect</dt><dd>At the next quiet moment: "Done! The Manila street food website is ready — take a look." The page opens on the Mac by itself.</dd>
         <dt>Tell class</dt><dd>It waits until nobody is talking, and it never reads out a file path.</dd>
         <dt>If it fails</dt><dd>Keep talking; the announcement stays queued and plays at the next pause.</dd>
       </dl>
