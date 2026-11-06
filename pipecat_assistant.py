@@ -36,8 +36,8 @@ ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
 TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
-# must match server.py's default (af_nicole: user choice Nov 6, sim 0.427 to owner)
-TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "af_nicole")
+# must match server.py's default (am_michael: user choice Nov 6, sim 0.387 to owner)
+TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_michael")
 # answers when the talker streams empty twice in a row ("" disables)
 FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
