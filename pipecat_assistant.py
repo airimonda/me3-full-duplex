@@ -184,6 +184,20 @@ def wake_split(text: str) -> tuple[bool, str]:
     return False, text.strip()
 
 
+_REFRESH_W = float(os.environ.get("ME3_VOICE_REFRESH_W", "0.1"))
+
+
+def blend_profile(old, new, w: float = _REFRESH_W):
+    """Voice-profile refresh: move the profile a step of `w` toward the new
+    utterance (unit-normalized), so one odd utterance can't take it over."""
+    old = np.asarray(old, dtype=np.float32)
+    new = np.asarray(new, dtype=np.float32)
+    old = old / (np.linalg.norm(old) + 1e-9)
+    new = new / (np.linalg.norm(new) + 1e-9)
+    out = (1.0 - w) * old + w * new
+    return (out / (np.linalg.norm(out) + 1e-9)).astype(np.float32)
+
+
 # mic mode: after this long with no accepted turn and no playback, Watson
 # goes idle and answers only wake-prefixed speech until woken again
 _IDLE_S = float(os.environ.get("ME3_IDLE_S", "300"))
@@ -833,7 +847,11 @@ class WatsonAgent(FrameProcessor):
                     if no_gate:
                         emb = self.spk.embed(norm)
                         if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                            self.spk.save_profile(emb)
+                            # blend, never replace: on Nov 6 one short "Watson
+                            # lights off" overwrote the profile and the owner
+                            # then scored 0.52-0.58 (locked out)
+                            self.speaker = blend_profile(self.speaker, emb)
+                            self.spk.save_profile(self.speaker)
                             self.log_event("voice_refreshed", sim=round(sim, 3))
             elif (is_wake and len(utt_pcm) > _IN_SR * 2):
                 # no profile yet: enroll ONLY a wake-prefixed speaker, so a
