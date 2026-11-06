@@ -227,6 +227,14 @@ def _wake_split_once(text: str) -> tuple[bool, str]:
 
 
 _REFRESH_W = float(os.environ.get("ME3_VOICE_REFRESH_W", "0.1"))
+# session claim by wake word: need this much voiced audio to know who it is
+_CLAIM_MIN_VOICED_S = float(os.environ.get("ME3_CLAIM_MIN_VOICED_S", "0.8"))
+# a "Watson" this close to Watson's own TTS voice is our echo, not a person
+_OWN_VOICE_SIM = float(os.environ.get("ME3_OWN_VOICE_SIM", "0.75"))
+
+
+def _cos(a, b) -> float:
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9))
 _MCP_POLL_S = 3.0   # how often the Pi asks the task MCP server for finished jobs
 
 
@@ -955,39 +963,47 @@ class WatsonAgent(FrameProcessor):
                 # mic mode: a fragment ("we", "okay") must not spawn a response —
                 # it would supersede the in-flight reply and kill it
                 return
-            elif self.speaker is not None:
-                # one embedding, off the event loop: on the Pi 4 resemblyzer
-                # takes seconds, and doing it inline (plus a second embed for
-                # the refresh) stalled ASR and barge-in (Nov 6: 12.6 s from
-                # transcript to LLM call)
+            else:
+                # Session ownership (owner's rule, Nov 6): only the person who
+                # holds the session is answered, and ANYONE takes the session
+                # by calling Watson; the previous person is then ignored
+                # until they call Watson again.
+                # One embedding, off the event loop: on the Pi 4 resemblyzer
+                # takes seconds (inline + a second refresh embed stalled ASR
+                # and barge-in: 12.6 s from transcript to LLM call, Nov 6).
                 emb = await asyncio.to_thread(self.spk.embed, norm)
-                sim = (float(np.dot(emb, self.speaker) / (np.linalg.norm(emb) * np.linalg.norm(self.speaker) + 1e-9))
-                       if emb is not None else -1.0)
-                if sim < 0.0:
-                    # embed failed (too quiet/short): fail OPEN, never lock out
-                    self.log_event("voice_gate_unavailable", user=text)
-                elif sim < self.spk.near_threshold():
-                    self.log_event("stranger_ignored", user=text, sim=round(sim, 3))
-                    return
-                elif sim < self.spk.threshold():
-                    # near-miss: accept, but only refresh the profile from
-                    # wake-prefixed commands (definitely the owner speaking)
-                    if no_gate:
-                        if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                            # blend, never replace: on Nov 6 one short "Watson
-                            # lights off" overwrote the profile and the owner
-                            # then scored 0.52-0.58 (locked out)
-                            self.speaker = blend_profile(self.speaker, emb)
-                            self.spk.save_profile(self.speaker)
-                            self.log_event("voice_refreshed", sim=round(sim, 3))
-            elif (is_wake and len(utt_pcm) > _IN_SR * 2):
-                # no profile yet: enroll ONLY a wake-prefixed speaker, so a
-                # stranger (or the TV) can never claim the profile by talking
-                emb = await asyncio.to_thread(self.spk.embed, norm)
-                if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                    self.spk.save_profile(emb)
-                    self.speaker = emb
-                    self.log_event("enrolled")
+                voiced = self.spk.voiced_seconds(norm) if emb is not None else 0.0
+                sim = (_cos(emb, self.speaker)
+                       if emb is not None and self.speaker is not None else -1.0)
+                if is_wake:
+                    if emb is None or voiced < _CLAIM_MIN_VOICED_S:
+                        # too short to know who it is: answer, keep the session
+                        self.log_event("voice_gate_unavailable", user=text)
+                    elif (self.watson_emb is not None
+                          and _cos(emb, self.watson_emb) > _OWN_VOICE_SIM):
+                        # our own reply saying "Watson" through the room
+                        self.log_event("echo_claim_ignored", user=text,
+                                       sim_watson=round(_cos(emb, self.watson_emb), 3))
+                        return
+                    elif self.speaker is None or sim < self.spk.near_threshold():
+                        had_owner = self.speaker is not None
+                        self.speaker = emb
+                        self.spk.save_profile(emb)
+                        self.log_event("session_claimed" if had_owner else "enrolled",
+                                       user=text, sim_prev=round(sim, 3))
+                    elif sim < self.spk.threshold() and voiced >= 2.0:
+                        # the same person, drifting: blend, never replace
+                        # (one short utterance once locked the owner out)
+                        self.speaker = blend_profile(self.speaker, emb)
+                        self.spk.save_profile(self.speaker)
+                        self.log_event("voice_refreshed", sim=round(sim, 3))
+                elif self.speaker is not None:
+                    if sim < 0.0:
+                        # embed failed (too quiet/short): fail OPEN
+                        self.log_event("voice_gate_unavailable", user=text)
+                    elif sim < self.spk.near_threshold():
+                        self.log_event("stranger_ignored", user=text, sim=round(sim, 3))
+                        return
         # bench mode: no voice gate — benchmark clips are not enrolled speakers
         self.last_active = time.monotonic()   # accepted turn: stay awake
         # a NEW accepted utterance supersedes an in-flight reply (fragments and
