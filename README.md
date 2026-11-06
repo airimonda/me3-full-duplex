@@ -43,11 +43,11 @@ The brain (VAD policy, gates, tool use, delegation) lives in one Pipecat `FrameP
 |---|---|
 | `pipecat_assistant.py` | the Pipecat agent — pipeline, gates, tools, delegation |
 | `server.py` | Whisper + Kokoro FastAPI server (ASR/TTS on :8300) |
-| `chat.py` | the original live full-duplex loop (wake word, DuplexGate) |
+| `brain.py` | system prompt, tool schemas, tool dispatcher |
 | `tasks.py` | sandboxed Hermes task manager (MAX_CONCURRENT = 2) |
 | `home.py` | Spotify (AppleScript; free account) + smart-home state |
 | `speakerid.py` | voice enrollment/similarity |
-| `duplex.py` / `bench_duplex.py` | echo-aware pause/barge decision core + FDB-style sim |
+| `legacy/` | deprecated: `chat.py`, `duplex.py` and their scripts |
 | `ui_server.py` | dashboard on :8301 |
 | `RESULTS.md` | frozen benchmark (run 16) + full progression |
 | `docs/paper.md` | research-style write-up: architecture, evaluation, findings |

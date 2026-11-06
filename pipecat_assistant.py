@@ -35,7 +35,11 @@ from pipecat.processors.frame_processor import FrameProcessor
 ME3 = Path(__file__).resolve().parent
 VAD_MODEL = ME3 / "fd-benchmark" / "models" / "silero_vad.onnx"
 SERVER = os.environ.get("ME3_SERVER", "http://127.0.0.1:8300")
-TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3")
+TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
+# must match server.py's default (am_michael: user choice Nov 6, sim 0.387 to owner)
+TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_michael")
+# answers when the talker streams empty twice in a row ("" disables)
+FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
@@ -83,6 +87,15 @@ _PROMPT_GATE = (
     "and do NOT say SILENT for it. When unsure between ANSWER and SILENT, choose "
     "ANSWER."
 )
+# bench mode: the talker answers directly (same-system rule: no agent harness
+# in the benchmark loop). "Describe X comprehensively" prompts otherwise get
+# DELEGATEd: 10-15 s to first token, a 5 s ack, then "hands full" on every
+# later trial while the background slots stay busy.
+_PROMPT_BENCH_NODELEGATE = (
+    " BENCHMARK OVERRIDE: never use the DELEGATE tag. For any request, however "
+    "broad or 'comprehensive', answer it yourself right away in one or two short "
+    "spoken sentences, under 25 words in total."
+)
 # mic mode: voice enrollment already rejects strangers/TV, so the SILENT gate
 # is redundant there and kept eating real commands ("build me a Mario game").
 # Benchmark mode keeps the gate (overheard clips, no voice check possible).
@@ -92,29 +105,177 @@ SYSTEM_PROMPT_MIC = _PROMPT_BASE
 # filler-only utterances and Whisper's classic hallucinations on short quiet
 # bursts / TV audio (ported from chat.py)
 FILLERS = {"um", "uh", "mhm", "hmm", "uh-huh", "huh", "mm", "yeah", "okay", "ok"}
+# backchannel vocabulary: an interrupting utterance made ONLY of these is
+# agreement/noise, not a request — resume the interrupted reply instead of
+# answering it. Subset + length caps keep real commands safe.
+BACKCHANNEL_TOKENS = FILLERS | {
+    "true", "right", "nice", "cool", "wow", "really", "exactly", "sure",
+    "oh", "yes", "alright", "totally", "good", "great", "same", "i", "know",
+    "that's", "that", "is", "so", "and", "all", "it's", "it", "think",
+}
 WHISPER_GHOSTS = {
     "thank you", "thank you very much", "thanks", "thanks for watching",
     "thanks for watching my video", "see you next time",
     "hello", "hi", "hey", "you", "so", "and", "the", "a", "i", "it",
     "mmhmm", "amen", "and you", "you know", "i know", "my pleasure",
     "go to see you in the next video", "see you in the next video",
-    "wharton", "watch on", "button",
 }
+
+# ---- wake word (high recall) ----------------------------------------------
+# Whisper mishears "Watson" a lot (Oct 30 live log: 6 of ~20 bare wakes came
+# out as "button", "Watch on.", "What's on?"). The old exact
+# startswith("watson") check dropped those silently. Match the first one or
+# two tokens (after an optional "hey"/"ok") against known mishearings, then
+# fall back to a fuzzy ratio. Recall over precision: a false wake only costs
+# a greeting or keeps the owner's voice gate in charge.
+_WAKE_WORDS = {
+    "watson", "watsons", "wattson", "watsun", "whatson", "watsen", "waston",
+    "wattsun", "watsom", "wharton", "walton", "button", "orton",
+    "batson", "matson", "watton", "wasson", "watts",
+}
+_WAKE_PAIRS = {
+    ("watch", "on"), ("what's", "on"), ("whats", "on"), ("what", "son"),
+    ("what", "sun"), ("watts", "on"), ("watt", "son"), ("wat", "son"),
+    ("watch", "son"), ("wash", "on"), ("that's", "on"), ("thats", "on"),
+    ("that", "son"),
+}
+_WAKE_LEAD = {"hey", "hi", "ok", "okay", "yo", "hello", "oh", "um", "uh", "ah"}
+_WAKE_FUZZ = 0.8
+_WAKE_TOK = re.compile(r"[a-z0-9']+")
+
+
+def _wake_fuzzy(word: str) -> bool:
+    import difflib
+    w = word.replace("'", "")
+    if not 4 <= len(w) <= 9:
+        return False
+    if difflib.SequenceMatcher(None, w, "watson").ratio() >= _WAKE_FUZZ:
+        return True
+    # Whisper swaps the opening consonant ("that sun", "that's on", "what son"):
+    # compare what follows it against "atson"
+    core = re.sub(r"^[^aeiou]+", "", w)
+    return (core.startswith("a")
+            and difflib.SequenceMatcher(None, core, "atson").ratio() >= _WAKE_FUZZ)
+
+
+# a pause after the wake word splits "Watson ... lights off" into two
+# utterances (600 ms endpoint): the one right after a bare wake is addressed
+_WAKE_FOLLOW_S = 8.0
+_GREETING_TOKENS = {"yes", "i'm", "im", "listening", "i", "am"}
+
+
+def wake_split(text: str) -> tuple[bool, str]:
+    """(is_wake, remainder). True when the utterance OPENS with the wake word
+    or a known mishearing of it; remainder is the original text after it."""
+    toks = [(m.group(), m.end()) for m in _WAKE_TOK.finditer(text.lower())]
+    starts = [0, 1] if toks and toks[0][0] in _WAKE_LEAD else [0]
+    # order matters: exact pair ("watts on") > single word ("watson is" must
+    # not consume "is") > fuzzy pair ("what sin")
+    for i in starts:
+        if i >= len(toks):
+            continue
+        pair = (toks[i][0], toks[i + 1][0]) if i + 1 < len(toks) else None
+        if pair in _WAKE_PAIRS:
+            return True, text[toks[i + 1][1]:].lstrip(" ,.!?;:-").strip()
+        if toks[i][0] in _WAKE_WORDS or _wake_fuzzy(toks[i][0]):
+            return True, text[toks[i][1]:].lstrip(" ,.!?;:-").strip()
+        if pair and _wake_fuzzy(pair[0] + pair[1]):
+            return True, text[toks[i + 1][1]:].lstrip(" ,.!?;:-").strip()
+    return False, text.strip()
+
+
+_REFRESH_W = float(os.environ.get("ME3_VOICE_REFRESH_W", "0.1"))
+
+
+def blend_profile(old, new, w: float = _REFRESH_W):
+    """Voice-profile refresh: move the profile a step of `w` toward the new
+    utterance (unit-normalized), so one odd utterance can't take it over."""
+    old = np.asarray(old, dtype=np.float32)
+    new = np.asarray(new, dtype=np.float32)
+    old = old / (np.linalg.norm(old) + 1e-9)
+    new = new / (np.linalg.norm(new) + 1e-9)
+    out = (1.0 - w) * old + w * new
+    return (out / (np.linalg.norm(out) + 1e-9)).astype(np.float32)
+
+
+# mic mode: after this long with no accepted turn and no playback, Watson
+# goes idle and answers only wake-prefixed speech until woken again
+_IDLE_S = float(os.environ.get("ME3_IDLE_S", "300"))
+
+def _voiced_db(pcm16: bytes) -> float:
+    """Median RMS (dBFS) of the voiced 30 ms frames (>10% of the loudest)."""
+    a = np.frombuffer(pcm16, dtype=np.int16).astype(np.float32) / 32768.0
+    n = int(_IN_SR * 0.03)
+    if len(a) < n:
+        return -120.0
+    r = np.sqrt((a[:len(a) // n * n].reshape(-1, n) ** 2).mean(1)) + 1e-9
+    return float(20 * np.log10(np.median(r[r > r.max() * 0.1])))
+
+
+# mic-mode barge-in by keyword: while Watson talks, the last _KW_WINDOW_S of
+# mic audio is transcribed and Watson stops only on one of these words.
+# Speaker-ID and waveform checks cannot separate the owner from Watson's own
+# louder echo on the Pi's open speaker (Nov 5 live tests).
+_BARGE_MODE = os.environ.get("ME3_BARGE_MODE", "keyword")   # keyword | voice
+_KW_WINDOW_S = 1.6
+_KW_EVERY_MS = 300           # min new audio between two keyword checks
+_STOP_WORDS = {"stop", "wait", "hold", "pause", "enough", "quiet", "shush"}
+_WAKE_FORMS = {"watson", "watsons", "wattson", "watsun", "whatson"}
+_STOP_ONLY = _STOP_WORDS | _WAKE_FORMS | {"please", "ok", "okay", "on", "it",
+                                           "there", "now", "right", "hey", "a", "second", "minute"}
+_ECHO_HIST_S = 3.0        # played audio kept as echo reference (16 kHz)
+_ECHO_CORR = 0.50         # xcorr at/above this = our own voice (duplex.py value)
+_ECHO_OVER = 1.6          # bursts must exceed the learned echo level by this
+_ECHO_RMS_CAP = 0.04      # learned echo level never grows past this (no lock-out)
+
+
+def _resample(samples: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
+    if sr_in == sr_out or len(samples) == 0:
+        return samples.astype(np.float32)
+    n = len(samples) * sr_out // sr_in
+    return np.interp(np.linspace(0, len(samples) - 1, n, endpoint=False),
+                     np.arange(len(samples)), samples).astype(np.float32)
+
+
+def xcorr_echo_score(candidate, reference, sr=16000):
+    """Copied from duplex.py: max normalized cross-correlation of the mic
+    burst against played audio, searched over the WHOLE reference (both at
+    16 kHz). The old in-class check compared 16 kHz mic against 24 kHz
+    playback over a +-100 ms window and never fired."""
+    n = min(len(candidate), len(reference), sr)   # cap candidate at 1 s
+    if n < sr // 10:
+        return 0.0
+    c = candidate[:n] - candidate[:n].mean()
+    best = 0.0
+    limit = len(reference) - n
+    for d in range(0, max(limit, 0) + 1, 80):
+        r = reference[d:d + n]
+        r = r - r.mean()
+        denom = (np.linalg.norm(c) * np.linalg.norm(r)) + 1e-9
+        best = max(best, float(np.dot(c, r) / denom))
+    return best
+
 
 def _token_set(s):
     return set(re.findall(r"[a-z0-9']+", s.lower()))
 
 _IN_SR = 16000
+_TALKER_TEMP = float(os.environ.get("ME3_TALKER_TEMP", "0"))
+_MIN_VOICED_DB = float(os.environ.get("ME3_MIN_VOICED_DB", "-30"))
+_HIST_KEEP = int(os.environ.get("ME3_HIST_KEEP", "12"))  # messages kept besides system
 _OUT_SR = 24000
 # USB PnP mics only accept 48k directly via PortAudio; capture at 48k and
 # downsample to 16k before VAD/ASR (no-op when the mic supports 16k).
 _MIC_SR = int(os.environ.get("ME3_MIC_SR", "48000"))
 
 
-def _to_in_sr(samples: np.ndarray) -> np.ndarray:
-    if _MIC_SR == _IN_SR:
+def _to_in_sr(samples: np.ndarray, sr: int) -> np.ndarray:
+    # resample by the FRAME's own rate: mic mode captures at _MIC_SR (48k),
+    # the bench transport delivers 16k — gating on _MIC_SR silently dropped
+    # every bench frame (no turns at all after the Nov 4 Pi patch)
+    if sr == _IN_SR:
         return samples
-    n = len(samples) * _IN_SR // _MIC_SR
+    n = len(samples) * _IN_SR // sr
     return np.interp(np.linspace(0, len(samples) - 1, n, endpoint=False),
                      np.arange(len(samples)), samples).astype(np.int16)
 _ENDPOINT_MS = 600
@@ -197,12 +358,26 @@ class WatsonAgent(FrameProcessor):
         self.probe_ms = 0.0
         self.probe_rms_peak = 0.0
         self.probe_pcm = bytearray()   # mic audio captured during the probe
-        self.play_ref = None           # pcm currently being played (echo reference)
-        self.play_pos = 0              # samples of play_ref already pushed
+        # echo reference: last _ECHO_HIST_S of pushed playback, resampled to
+        # 16 kHz so it matches the mic; plus the learned self-echo level
+        self.played16 = np.zeros(0, dtype=np.float32)
+        self.echo_rms = None
+        self.echo_checked_ms = 0.0
+        self.echo_best = 0.0
+        self.last_verdict = None
+        self.play_mic = bytearray()     # last _KW_WINDOW_S of mic audio while playing
+        self.kw_task = None
+        self.kw_checked_ms = 0.0
+        self.spoken_tokens = set()      # words of the reply being spoken (echo filter)
+        self.last_task_check = 0.0
+        self.announce_task = None
+        # idle state (mic mode): last accepted turn / playback / wake word
+        self.last_active = time.monotonic()
+        self.wake_follow_until = 0.0    # bare wake: next utterance is addressed
         # speaker enrollment: same profile file as the live loop (chat.py)
         sys.path.insert(0, str(Path.home() / "me3"))
         import speakerid
-        import chat as chatbrain      # QUICK_TOOLS + execute_tool (single source of truth)
+        import brain as chatbrain     # SYSTEM_PROMPT + QUICK_TOOLS + execute_tool
         import tasks as taskmgr       # sandboxed Hermes delegation
         self.chatbrain = chatbrain
         self.taskmgr = taskmgr
@@ -210,22 +385,114 @@ class WatsonAgent(FrameProcessor):
         self.mode = os.environ.get("ME3_MODE", "bench")
         # chat.py's full prompt (tools + delegation rules) in both modes; the
         # addressed-speech gate paragraph is bench-only (mic uses voice enrollment)
-        sysprompt = chatbrain.SYSTEM_PROMPT + (_PROMPT_GATE if self.mode == "bench" else "")
+        sysprompt = chatbrain.SYSTEM_PROMPT + (_PROMPT_GATE + _PROMPT_BENCH_NODELEGATE
+                                                if self.mode == "bench" else "")
         self.history = [{"role": "system", "content": sysprompt}]
         self.spk = speakerid
         self.speaker = speakerid.load_profile()
         # the resemblyzer encoder takes ~100 s to load — warm it in the
         # background so the first gated turn doesn't freeze
         import threading
-        threading.Thread(target=self.spk._encoder, daemon=True).start()
+        self.watson_emb = None     # embedding of Watson's own TTS voice
+        self.verify_task = None    # in-flight voice check of a barge probe
+        threading.Thread(target=self._warm_voices, daemon=True).start()
+
+    def _warm_voices(self):
+        """Load the encoder, then (mic mode) embed Watson's own voice so a
+        barge probe can be told apart from Watson's echo by WHO is speaking:
+        acoustic echo correlation fails on the Pi (separate mic/speaker
+        clocks, room reverb), but the speaker embedding survives the room."""
+        if self.mode == "mic":
+            # leave CPU for audio: 4 torch threads made playback stutter on
+            # the Pi (embed ~400 ms on all cores; 2 threads ~0.5 s)
+            import torch
+            torch.set_num_threads(2)
+        self.spk._encoder()
+        if self.mode != "mic":
+            return
+        try:
+            r = httpx.post(SERVER + "/speak", timeout=60, json={"voice": TTS_VOICE,
+                "text": "The Eiffel Tower was built in Paris for the World Fair. "
+                        "Sure, I can help with that, it is three in the afternoon."})
+            a = np.frombuffer(_wav_pcm(r.content), dtype=np.int16)
+            a = _resample(a, _OUT_SR, _IN_SR) / 32768.0
+            self.watson_emb = self.spk.embed((a / (np.abs(a).max() + 1e-9)).astype(np.float32))
+            self.log_event("watson_voice_ready", voice=TTS_VOICE,
+                           sim_owner=(round(float(np.dot(self.watson_emb, self.speaker)), 3)
+                                      if self.speaker is not None else None))
+        except Exception as e:
+            self.log_event("watson_voice_error", err=repr(e)[:120])
+
+    async def _prompt_after_stop(self, gen: int):
+        """After 'Watson'/'wait' stopped a reply: if the owner has not kept
+        talking within ~1 s, say "Go ahead" so they repeat the request on a
+        clean (echo-free) mic."""
+        await asyncio.sleep(1.0)
+        if self.gen != gen or self.in_speech or self.playing:
+            return
+        self.log_event("prompt_after_stop")
+        try:
+            r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
+            wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
+        except Exception:
+            wav = await self._speak("Go ahead.")
+        if wav and self.gen == gen and not self.in_speech:
+            self.playing = True
+            await self._play_pcm(_wav_pcm(wav), gen)
+            self.playing = False
+
+    async def _keyword_check(self, pcm: bytes):
+        """(hit, transcript): a stop word or "Watson" that Watson is not
+        itself saying in the current reply. Fails closed (no stop) on error."""
+        try:
+            heard = await self._asr(pcm)
+        except Exception as e:
+            self.log_event("kw_asr_error", err=repr(e)[:120])
+            return False, ""
+        toks = _token_set(heard)
+        hits = (toks & (_STOP_WORDS | _WAKE_FORMS)) - self.spoken_tokens
+        return bool(hits), heard
+
+    async def _voice_verdict(self, pcm: bytes):
+        """(is_echo, sim_watson, sim_owner) for a barge probe. Fails open:
+        any problem returns is_echo=False so a real barge still stops."""
+        a = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        a = a / (np.abs(a).max() + 1e-9)
+        e = await asyncio.to_thread(self.spk.embed, a)
+        if e is None or self.watson_emb is None or self.speaker is None:
+            return False, None, None
+        sw, so = float(np.dot(e, self.watson_emb)), float(np.dot(e, self.speaker))
+        return sw > so, round(sw, 3), round(so, 3)
+
+    async def _commit_barge(self):
+        from pipecat.frames.frames import InterruptionFrame
+        from pipecat.processors.frame_processor import FrameDirection
+        # sustained speech that is NOT echo: commit the interruption
+        self.probing = False
+        self.verify_task = None
+        # the probe window IS the start of the interrupting utterance —
+        # keep it, or a short backchannel ("uh-huh yeah", <1 s) reaches ASR
+        # as only its silent tail (ignored_quiet peak 0.0) and resume never fires
+        self.buf = self.probe_pcm
+        self.speech_ms = self.probe_ms
+        self.probe_pcm = bytearray()
+        self.gen += 1
+        self.playing = False
+        self.in_speech = True
+        self.barged = True
+        await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
+        self.log_event("barge_in", rms=round(self.probe_rms_peak, 3),
+                       echo_best=round(self.echo_best, 3), voice=self.last_verdict)
+        self._dump_barge()
 
     # ---- audio path ------------------------------------------------------
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
         from pipecat.frames.frames import InputAudioRawFrame
         from pipecat.processors.frame_processor import FrameDirection
-        if isinstance(frame, InputAudioRawFrame) and frame.sample_rate == _MIC_SR:
-            await self._on_audio(_to_in_sr(np.frombuffer(frame.audio, dtype=np.int16)))
+        if isinstance(frame, InputAudioRawFrame):
+            await self._on_audio(_to_in_sr(np.frombuffer(frame.audio, dtype=np.int16),
+                                           frame.sample_rate))
         else:
             await self.push_frame(frame, direction)
 
@@ -240,37 +507,106 @@ class WatsonAgent(FrameProcessor):
         floor = max(0.018, self.ambient_rms * 2.0)
 
         if self.playing:
+            self.play_mic.extend(pcm)
+            keep = int(_KW_WINDOW_S * _IN_SR) * 2
+            if len(self.play_mic) > keep:
+                del self.play_mic[:len(self.play_mic) - keep]
             # probes do NOT pause playback — audio keeps flowing; only a
             # confirmed (non-echo, sustained) interruption stops it
             if self.probing:
                 self.probe_pcm.extend(pcm)
                 self.probe_ms += ms
                 self.probe_rms_peak = max(self.probe_rms_peak, rms)
-                echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
-                if echo > 0.5:
-                    # Watson's own voice coming back — abort silently
+                echo = 0.0
+                # waveform echo check: bench only. On the Pi it cost 50 ms on
+                # the event loop every 100 ms (audible stutter) and scored
+                # 0.21-0.48 on real echo; mic mode uses the voice check instead
+                if (self.mode == "bench" and self.probe_ms >= 200
+                        and self.probe_ms - self.echo_checked_ms >= 100):
+                    self.echo_checked_ms = self.probe_ms
+                    echo = self._echo_score(np.frombuffer(self.probe_pcm, dtype=np.int16))
+                    self.echo_best = max(self.echo_best, echo)
+                if echo >= _ECHO_CORR:
+                    # Watson's own voice coming back — abort silently, and
+                    # learn how loud our echo is (duplex.py note_echo)
                     self.probing = False
                     self.probe_pcm = bytearray()
-                    self.log_event("echo_ignored", echo=round(echo, 2))
+                    self.echo_rms = min(_ECHO_RMS_CAP,
+                                        max(self.echo_rms or 0.0, self.probe_rms_peak))
+                    self.log_event("echo_ignored", echo=round(echo, 2),
+                                   echo_rms=round(self.echo_rms, 3))
                 elif state == VADState.QUIET and rms < floor:
                     self.probing = False
                     self.probe_pcm = bytearray()
-                    self.log_event("probe_resume", probe_ms=round(self.probe_ms, 1))
+                    self.log_event("probe_resume", probe_ms=round(self.probe_ms, 1),
+                                   echo_best=round(self.echo_best, 3))
+                elif (self.probe_ms >= 600 and self.mode == "mic"
+                        and _BARGE_MODE == "keyword"):
+                    # mic mode: stop only on a spoken stop word / "Watson".
+                    # Playback keeps running while Whisper checks (no pause).
+                    if self.kw_task is None:
+                        if self.probe_ms - self.kw_checked_ms >= _KW_EVERY_MS:
+                            self.kw_checked_ms = self.probe_ms
+                            self.kw_task = asyncio.create_task(
+                                self._keyword_check(bytes(self.play_mic)))
+                    elif self.kw_task.done():
+                        hit, heard = self.kw_task.result()
+                        self.kw_task = None
+                        self.last_verdict = {"heard": heard}
+                        if hit:
+                            # the window is mostly Watson's own echo: ASR of it
+                            # returns Watson's words and the voice gate drops
+                            # it (Nov 5 test). Discard it and listen fresh.
+                            self.probe_pcm = bytearray()
+                            self.probe_ms = 0.0
+                            await self._commit_barge()
+                            self.in_speech = False
+                            self.speech_ms = 0.0
+                            toks = _token_set(heard)
+                            if toks & (_WAKE_FORMS | {"wait", "hold"}):
+                                asyncio.create_task(self._prompt_after_stop(self.gen))
+                            else:
+                                self.log_event("stopped_by_user", heard=heard[:80])
+                        else:
+                            self.log_event("echo_ignored", by="keyword", heard=heard[:80],
+                                           rms=round(self.probe_rms_peak, 3))
                 elif self.probe_ms >= 600:
-                    # sustained speech that is NOT echo: commit the interruption
-                    self.probing = False
-                    self.probe_pcm = bytearray()
-                    self.gen += 1
-                    self.playing = False
-                    self.buf = bytearray()
-                    self.in_speech = True
-                    self.barged = True
-                    await self.push_frame(InterruptionFrame(), FrameDirection.DOWNSTREAM)
-                    self.log_event("barge_in", rms=round(self.probe_rms_peak, 3))
-            elif state != VADState.QUIET and rms > floor:
+                    # mic mode: before stopping, check WHO is speaking —
+                    # Watson's own echo sounds like Watson, not the owner.
+                    # Playback keeps running while the check runs (no pause).
+                    if (self.mode == "mic" and self.watson_emb is not None
+                            and self.speaker is not None):
+                        if self.verify_task is None:
+                            self.verify_task = asyncio.create_task(
+                                self._voice_verdict(bytes(self.probe_pcm)))
+                        elif self.verify_task.done():
+                            is_echo, sw, so = self.verify_task.result()
+                            self.verify_task = None
+                            self.last_verdict = {"sim_watson": sw, "sim_owner": so}
+                            self._dump_verdict(is_echo, sw, so)
+                            if is_echo:
+                                self.probing = False
+                                self.probe_pcm = bytearray()
+                                self.log_event("echo_ignored", by="voice",
+                                               sim_watson=sw, sim_owner=so,
+                                               rms=round(self.probe_rms_peak, 3))
+                            else:
+                                await self._commit_barge()
+                    else:
+                        self.last_verdict = None
+                        await self._commit_barge()
+            elif (state != VADState.QUIET and rms > floor
+                    and rms > (self.echo_rms or 0.0) * _ECHO_OVER):
                 # suspect a barge: confirm over the probe window first
+                # (bursts below the learned echo level are our own voice)
                 self.probing = True
                 self.probe_ms = 0.0
+                self.echo_checked_ms = 0.0
+                self.echo_best = 0.0
+                self.verify_task = None
+                self.last_verdict = None
+                self.kw_task = None
+                self.kw_checked_ms = 0.0
                 self.probe_rms_peak = rms
                 self.probe_pcm = bytearray(pcm)  # start the probe buffer with this frame
             else:
@@ -279,6 +615,10 @@ class WatsonAgent(FrameProcessor):
                 self.barge_ms = max(0.0, self.barge_ms - ms)
             return
 
+        # not playing: the keyword window must never carry the previous
+        # command into the next reply
+        if self.play_mic:
+            self.play_mic = bytearray()
         if state != VADState.QUIET:
             self.buf.extend(pcm)
             self.in_speech = True
@@ -298,6 +638,35 @@ class WatsonAgent(FrameProcessor):
         else:
             # idle: keep learning the ambient noise floor
             self.ambient_rms = 0.9 * self.ambient_rms + 0.1 * rms
+            # finished background tasks: announce once per second check,
+            # only while nobody is talking and no reply is in flight
+            now = time.monotonic()
+            if (self.mode == "mic" and now - self.last_task_check >= 1.0
+                    and (self.respond_task is None or self.respond_task.done())
+                    and (self.announce_task is None or self.announce_task.done())):
+                self.last_task_check = now
+                self.announce_task = asyncio.create_task(self._announce_finished())
+
+    async def _announce_finished(self):
+        """Speak the line for each newly finished background task (ported
+        from legacy/chat.py's idle loop) and open its deliverable."""
+        try:
+            done = self.taskmgr.check_finished()
+        except Exception as e:
+            self.log_event("announce_error", err=repr(e)[:120])
+            return
+        for tid in done:
+            line = self.taskmgr.announcement(tid)
+            if not line:
+                continue
+            gen = self.gen
+            wav = await self._speak(line)
+            if wav and self.gen == gen and not self.in_speech:
+                self.playing = True
+                await self._play_pcm(_wav_pcm(wav), gen)
+                self.playing = False
+            opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
+            self.log_event("announce", id=tid, line=line, opened=opened)
 
     # ---- brain -----------------------------------------------------------
     def _set_timer_local(self, secs: int, label: str) -> str:
@@ -356,29 +725,82 @@ class WatsonAgent(FrameProcessor):
         gen = self.gen
         # volume gate: TV/radio clips sit far below live speech level
         peak = float(np.max(np.abs(np.frombuffer(utt_pcm, dtype=np.int16)))) / 32768.0
-        if peak < 0.10:
+        # bench only: in mic mode the voice-ID gate rejects TV/strangers, and
+        # this fixed level dropped the owner at normal USB-mic gain (Nov 5)
+        if self.mode == "bench" and peak < 0.10:
             self.log_event("ignored_quiet", peak=round(peak, 3))
+            return
+        # faint-speech gate (bench only; mic mode has the voice-ID gate):
+        # background speech peaks above the 0.10 gate but its typical voiced
+        # level is -31..-36 dBFS vs -12..-28 for addressed turns (dataset scan)
+        lvl_db = _voiced_db(utt_pcm)
+        if self.mode == "bench" and lvl_db < _MIN_VOICED_DB:
+            self.log_event("ignored_faint", lvl_db=round(lvl_db, 1))
             return
         from pipecat.frames.frames import OutputAudioRawFrame
         text = await self._asr(utt_pcm)
         t_asr = time.perf_counter()
         if not text or len(text.strip()) < 2:
             return
-        self.log_event("asr", text=text, asr_s=round(t_asr - t0, 3))
+        self.log_event("asr", text=text, asr_s=round(t_asr - t0, 3),
+                       lvl_db=round(lvl_db, 1))
         # ghost filter: Whisper's classic hallucinations on short bursts / TV
         # audio — drop before they count as speech or touch the voice profile
+        is_wake, wake_rest = wake_split(text)
         norm = re.sub(r"[^\w\s]", "", text.lower()).strip()
-        no_wake = not norm.startswith("watson")
+        followup = False
+        is_wake, wake_rest = wake_split(text)
+        # (ghosts, fillers and the echo of our own greeting don't use it up)
+        if (not is_wake and time.monotonic() < self.wake_follow_until
+                and norm not in WHISPER_GHOSTS and not _token_set(text) <= FILLERS
+                and not _token_set(text) <= _GREETING_TOKENS):
+            is_wake, wake_rest, followup = True, text.strip(), True
+            self.wake_follow_until = 0.0
+            self.log_event("wake_followup", user=text)
+        no_wake = not is_wake
+        # bare stop after a keyword barge ("stop", "Watson, wait"): the
+        # interruption itself was the request — stay quiet, drop the remainder
+        if (self.barged and _token_set(text)
+                and _token_set(text) <= _STOP_ONLY
+                and _token_set(text) & (_STOP_WORDS | _WAKE_FORMS)):
+            self.barged = False
+            self.resume_pcm = None
+            self.log_event("stopped_by_user", user=text)
+            return
+        # backchannel resume: a barge committed, but the interrupting
+        # utterance is pure backchannel ("yeah", "true", "uh-huh") — not a
+        # request. Resume the reply we were interrupted in; never answer it.
+        # (checked BEFORE the ghost filter so an "I know" also resumes)
+        if (no_wake and self.barged and self.resume_pcm
+                and len(_token_set(text)) <= 6
+                and _token_set(text) <= BACKCHANNEL_TOKENS):
+            pcm, self.resume_pcm = self.resume_pcm, None
+            self.barged = False
+            self.playing = True
+            self.log_event("backchannel_resume", user=text)
+            await self._play_pcm(pcm, self.gen)
+            self.playing = False
+            return
         if no_wake and norm in WHISPER_GHOSTS:
             self.log_event("ghost_ignored", user=text)
             return
         if no_wake and _token_set(text) <= FILLERS:
             self.log_event("filler_ignored", user=text)
             return
+        # idle (mic mode): 5 min with no accepted turn and no playback ->
+        # answer only wake-prefixed speech. Bench clips never say "Watson".
+        idle_s = time.monotonic() - self.last_active
+        if self.mode == "mic" and idle_s > _IDLE_S:
+            if no_wake:
+                self.log_event("ignored_idle", user=text, idle_s=round(idle_s))
+                return
+            self.log_event("woke", user=text, idle_s=round(idle_s))
+        if is_wake:
+            self.last_active = time.monotonic()
         # wake-word handling: bare "Watson" -> greet; "Watson, ..." -> strip the
         # wake word and ALWAYS answer (never let the SILENT gate eat a command)
-        low = text.strip().lower().strip(".,!? ")
-        if low in ("watson", "watson?"):
+        if is_wake and not (_token_set(wake_rest) - FILLERS):
+            self.wake_follow_until = time.monotonic() + _WAKE_FOLLOW_S
             wav = await self._speak("Yes? I'm listening.")
             if wav:
                 self.playing = True
@@ -389,16 +811,23 @@ class WatsonAgent(FrameProcessor):
         # speaker gate: same voice profile the live loop uses.
         # Normalize first — the raw mic level here is low and embed()'s
         # silence-trim would otherwise discard the whole utterance.
-        no_gate = self.mode == "bench" or low.startswith("watson")
-        if no_gate and low.startswith("watson") and len(low) > 6:
-            text = text.strip()[7:].strip(" ,.!?") or text.strip()
+        # wake-prefixed speech skips BOTH gates. Do NOT add `mode == "bench"`
+        # here: it disables bench's SILENT gate (SILENT then gets spoken and
+        # overheard-speech resume never runs). The voice gate below is
+        # already mic-only.
+        no_gate = is_wake
+        heard = text.strip()
+        if is_wake:
+            text = wake_rest or heard
         norm = np.frombuffer(utt_pcm, dtype=np.int16).astype(np.float32)
         norm /= (np.abs(norm).max() + 1e-9)
         if self.mode == "mic":
             # fragments/gibberish embed unreliably — don't voice-gate them (the
             # SILENT gate handles them); only gate real sentences
-            words = text.strip().split()
-            fragment = len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text)
+            # wake-prefixed: count the whole utterance ("Watson, lights off"
+            # is addressed and long enough to embed, not a fragment)
+            words = (heard if is_wake else text).split()
+            fragment = not followup and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
                 # mic mode: a fragment ("we", "okay") must not spawn a response —
@@ -418,9 +847,13 @@ class WatsonAgent(FrameProcessor):
                     if no_gate:
                         emb = self.spk.embed(norm)
                         if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                            self.spk.save_profile(emb)
+                            # blend, never replace: on Nov 6 one short "Watson
+                            # lights off" overwrote the profile and the owner
+                            # then scored 0.52-0.58 (locked out)
+                            self.speaker = blend_profile(self.speaker, emb)
+                            self.spk.save_profile(self.speaker)
                             self.log_event("voice_refreshed", sim=round(sim, 3))
-            elif (low.startswith("watson") and len(utt_pcm) > _IN_SR * 2):
+            elif (is_wake and len(utt_pcm) > _IN_SR * 2):
                 # no profile yet: enroll ONLY a wake-prefixed speaker, so a
                 # stranger (or the TV) can never claim the profile by talking
                 emb = self.spk.embed(norm)
@@ -429,6 +862,7 @@ class WatsonAgent(FrameProcessor):
                     self.speaker = emb
                     self.log_event("enrolled")
         # bench mode: no voice gate — benchmark clips are not enrolled speakers
+        self.last_active = time.monotonic()   # accepted turn: stay awake
         # a NEW accepted utterance supersedes an in-flight reply (fragments and
         # ghosts never got here — they can't kill the real reply)
         prev = self.respond_task
@@ -458,31 +892,44 @@ class WatsonAgent(FrameProcessor):
                                first_audio_s=round(t_asr - t0, 3),
                                total_s=round(time.perf_counter() - t0, 3))
                 return
+        self.spoken_tokens = set()   # new reply: only its own words are echo
         self.history.append({"role": "user", "content": text})
+        # cap context: talker first-token grows with history (glm-5.3-flash:
+        # 1.1-2.0 s at 2 msgs vs 2.0-3.7 s at 54; bench spikes hit 7-10 s and
+        # missed the 8 s turn window). Keep system + the last _HIST_KEEP
+        # messages, cut at a user message so no tool reply loses its call.
+        if len(self.history) > _HIST_KEEP + 1:
+            tail = self.history[-_HIST_KEEP:]
+            while tail and tail[0]["role"] != "user":
+                tail.pop(0)
+            self.history = [self.history[0]] + tail
         reply = ""
         ack = None
         delegate_rest = False
         first_audio = None
         # bench mode: hard-cap the reply so playback never bleeds into the
         # next trial (36 s replies caused false TORs at trial boundaries)
-        max_words = 60 if self.mode == "bench" else 400
+        max_words = 35 if self.mode == "bench" else 400
         first_token = None
 
-        async def one_pass(msgs, use_tools):
+        async def one_pass(msgs, use_tools, model=TALKER_MODEL):
             """One streaming LLM pass. Accumulates tool calls; emits TTS
             sentence-by-sentence; returns the tool calls (if any)."""
             nonlocal first_token, first_audio, reply, delegate_rest
             calls = {}
             buf = ""
-            body = {"model": TALKER_MODEL, "messages": msgs, "stream": True,
-                    "max_tokens": 400}
+            body = {"model": model, "messages": msgs, "stream": True,
+                    "max_tokens": 400,
+                    # deterministic gate: at the provider default temperature the
+                    # SILENT/ANSWER call flipped run to run on identical audio
+                    "temperature": _TALKER_TEMP}
             if use_tools:
                 body["tools"] = self.tools
             stream = await self.http.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}"}, json=body)
             self.log_event("llm_http", status=stream.status_code,
-                           model=TALKER_MODEL, n_msgs=len(msgs),
+                           model=model, n_msgs=len(msgs),
                            n_tools=len(body.get("tools", [])))
             async for line in stream.aiter_lines():
                 if self.gen != gen:
@@ -556,14 +1003,22 @@ class WatsonAgent(FrameProcessor):
 
         try:
             calls = None
-            for attempt in (1, 2):
+            # two tries on the talker, then one on the fallback model:
+            # glm-5.3-flash sometimes streams an empty reply twice in a row
+            # (bench 13-22-28: turn-taking miss), the fallback answers instead
+            tries = [TALKER_MODEL, TALKER_MODEL]
+            if FALLBACK_MODEL and FALLBACK_MODEL != TALKER_MODEL:
+                tries.append(FALLBACK_MODEL)
+            for attempt, model in enumerate(tries, 1):
+                if model != TALKER_MODEL:
+                    self.log_event("llm_fallback", model=model, user=text)
                 try:
-                    calls = await one_pass(self.history, True)
+                    calls = await one_pass(self.history, True, model)
                 except Exception as e:
                     self.log_event("llm_stream_error", attempt=attempt,
-                                   err=repr(e)[:120])
+                                   model=model, err=repr(e)[:120])
                     calls = None
-                    if attempt == 2:
+                    if attempt == len(tries):
                         raise
                 if (reply or calls or first_audio is not None
                         or self.gen != gen):
@@ -602,7 +1057,11 @@ class WatsonAgent(FrameProcessor):
             print("[watson] respond_error:", traceback.format_exc()[-300:], flush=True)
         finally:
             self.playing = False
-            self.barged = False
+            # an interrupted turn must NOT clear the barge flag: the barge
+            # bumped gen, and the interrupting utterance (ASR'd ~1 s later)
+            # needs barged + resume_pcm to decide backchannel-resume
+            if self.gen == gen:
+                self.barged = False
             total = time.perf_counter() - t0
             if reply.strip():
                 self.history.append({"role": "assistant", "content": reply})
@@ -643,8 +1102,9 @@ class WatsonAgent(FrameProcessor):
             if r.status_code != 200:
                 return None
             return r.content
+        self.spoken_tokens |= _token_set(text)
         r = await self.http.post(f"{SERVER}/speak",
-                                 json={"text": text, "voice": "af_heart"})
+                                 json={"text": text, "voice": TTS_VOICE})
         if r.status_code != 200:
             return None
         return r.content
@@ -652,33 +1112,49 @@ class WatsonAgent(FrameProcessor):
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
 
+    def _dump_verdict(self, is_echo, sw, so):
+        """Mic mode: save every voice verdict's probe audio (echo or owner)
+        to runs/live/verdicts/<t>_<echo|owner>.npz for threshold tuning."""
+        if self.mode != "mic":
+            return
+        try:
+            d = self.log_dir / "verdicts"
+            d.mkdir(exist_ok=True)
+            np.savez_compressed(d / f"{time.time():.3f}_{'echo' if is_echo else 'owner'}.npz",
+                                probe=np.frombuffer(bytes(self.probe_pcm), dtype=np.int16),
+                                sim_watson=sw if sw is not None else -1.0,
+                                sim_owner=so if so is not None else -1.0)
+        except Exception as e:
+            self.log_event("verdict_dump_error", err=repr(e)[:120])
+
+    def _dump_barge(self):
+        """Mic mode diagnostics: save the probe audio and the playback
+        reference of every committed barge-in, to tune the echo check on
+        real room audio (runs/live/barges/<t>.npz)."""
+        if self.mode != "mic":
+            return
+        try:
+            d = self.log_dir / "barges"
+            d.mkdir(exist_ok=True)
+            np.savez_compressed(d / f"{time.time():.3f}.npz",
+                                probe=np.frombuffer(bytes(self.buf), dtype=np.int16),
+                                ref=self.played16.astype(np.float32),
+                                echo_best=self.echo_best)
+        except Exception as e:
+            self.log_event("barge_dump_error", err=repr(e)[:120])
+
     def _echo_score(self, mic: np.ndarray) -> float:
-        """Normalized correlation of the probe mic audio against the audio
-        Watson is currently playing (searching a small delay window).
-        High score = the mic is hearing Watson's own voice."""
-        if self.play_ref is None or len(mic) < 400:
+        """High score = the mic is hearing Watson's own voice."""
+        if len(mic) < 400 or len(self.played16) < 1600:
             return 0.0
-        ref = np.frombuffer(self.play_ref, dtype=np.int16).astype(np.float32)
-        m = mic.astype(np.float32)
-        if np.std(m) < 1e-6:
-            return 0.0
-        best = 0.0
-        # the mic hears what was played ~0-100 ms ago; play_pos is in samples
-        base = max(0, self.play_pos - len(m))
-        for off in range(-800, 2401, 160):
-            s = ref[max(0, base + off):base + off + len(m)]
-            if len(s) != len(m) or np.std(s) < 1e-6:
-                continue
-            c = abs(float(np.corrcoef(m, s)[0, 1]))
-            best = max(best, c)
-        return best
+        return xcorr_echo_score(mic.astype(np.float32), self.played16)
 
     async def _play_pcm(self, pcm: bytes, gen: int):
         from pipecat.frames.frames import OutputAudioRawFrame
         chunk = 1200  # 50 ms at 24 kHz
         played = 0
-        self.play_ref = pcm
-        self.play_pos = 0
+        prebuffer = 6  # first 300 ms pushed at once: slack against loop stalls
+        n_seg = 0
         while played < len(pcm):
             if self.gen != gen:
                 # interrupted: stash the unplayed PCM so we can resume
@@ -686,9 +1162,13 @@ class WatsonAgent(FrameProcessor):
                 return
             seg = pcm[played:played + chunk * 2]
             played += len(seg)
-            self.play_pos = played // 2
+            ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
+            self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
-            await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
+            self.last_active = time.monotonic()   # speaking = activity (idle timer)
+            n_seg += 1
+            if n_seg > prebuffer:
+                await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
 
     def log_event(self, event: str, **kw):
         rec = {"t": round(time.time(), 3), "event": event, **kw}
@@ -724,7 +1204,7 @@ async def build(transport, log_dir: Path):
 
     worker = PipelineWorker(
         Pipeline([transport.input(), agent, transport.output()]),
-        params=PipelineParams(audio_in_sample_rate=_MIC_SR, audio_out_sample_rate=_OUT_SR),
+        params=PipelineParams(audio_in_sample_rate=_IN_SR, audio_out_sample_rate=_OUT_SR),
         enable_tracing=False,
         cancel_on_idle_timeout=False,  # quiet stretches between trials must not kill us
     )

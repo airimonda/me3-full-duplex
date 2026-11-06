@@ -4,7 +4,7 @@ Each delegated task is a headless Hermes one-shot run in its own sandbox folder:
   hermes chat --oneshot --query-file prompt.txt --in <sandbox> --max-turns N --run-budget S
 
 The talker keeps conversing while tasks run. After each conversational turn,
-chat.py calls check_finished() and announces any newly completed task aloud.
+check_finished() returns newly completed tasks. Only legacy/chat.py announced them; pipecat_assistant.py does not call it yet.
 """
 import os
 import re
