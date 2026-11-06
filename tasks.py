@@ -48,8 +48,11 @@ def _which(name):
     found = shutil.which(name)
     if found:
         return found
-    local = os.path.expanduser(f"~/.local/bin/{name}")
-    return local if os.path.exists(local) else name
+    for d in ("~/.local/bin", "~/.pi/agent/bin"):   # pi.dev installer: ~/.pi/agent/bin
+        local = os.path.expanduser(f"{d}/{name}")
+        if os.path.exists(local):
+            return local
+    return name
 
 
 def _sandboxed(cmd, tdir):
