@@ -29,6 +29,7 @@ import wave
 from pathlib import Path
 
 import httpx
+import mcp_client   # Pi -> Mac task MCP server (ME3_TASKS_MCP)
 import numpy as np
 from pipecat.processors.frame_processor import FrameProcessor
 
@@ -212,6 +213,7 @@ def _wake_split_once(text: str) -> tuple[bool, str]:
 
 
 _REFRESH_W = float(os.environ.get("ME3_VOICE_REFRESH_W", "0.1"))
+_MCP_POLL_S = 3.0   # how often the Pi asks the task MCP server for finished jobs
 
 
 def blend_profile(old, new, w: float = _REFRESH_W):
@@ -398,11 +400,15 @@ class WatsonAgent(FrameProcessor):
         self.spoken_tokens = set()      # words of the reply being spoken (echo filter)
         self.last_task_check = 0.0
         self.announce_task = None
+        self.last_mcp_poll = 0.0
+        self.pending_announce = []      # finished-task lines not yet spoken
         # idle state (mic mode): last accepted turn / playback / wake word
         self.last_active = time.monotonic()
         self.wake_follow_until = 0.0    # bare wake: next utterance is addressed
         # speaker enrollment: same profile file as the live loop (chat.py)
-        sys.path.insert(0, str(Path.home() / "me3"))
+        # this file's own folder (~/me3 on the Pi), not a hard-coded ~/me3:
+        # a checkout elsewhere must import its own brain.py / tasks.py
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
         import speakerid
         import brain as chatbrain     # SYSTEM_PROMPT + QUICK_TOOLS + execute_tool
         import tasks as taskmgr       # sandboxed Hermes delegation
@@ -675,25 +681,44 @@ class WatsonAgent(FrameProcessor):
                 self.announce_task = asyncio.create_task(self._announce_finished())
 
     async def _announce_finished(self):
-        """Speak the line for each newly finished background task (ported
-        from legacy/chat.py's idle loop) and open its deliverable."""
+        """Announce finished background tasks, one at a time, only while
+        nobody is talking. With ME3_TASKS_MCP set (Pi), jobs run on the Mac
+        task MCP server, which already opened the deliverable; otherwise
+        tasks.py runs locally and we open it here. A line that gets cut off
+        (the user starts talking) stays queued and is retried."""
+        now = time.monotonic()
         try:
-            done = self.taskmgr.check_finished()
+            if mcp_client.enabled():
+                if now - self.last_mcp_poll >= _MCP_POLL_S:
+                    self.last_mcp_poll = now
+                    raw = await asyncio.to_thread(mcp_client.call, "finished", 5.0)
+                    for a in json.loads(raw or "[]"):
+                        self.pending_announce.append(
+                            {"id": a.get("id"), "line": a.get("line", ""), "opened": a.get("opened")})
+            else:
+                for tid in self.taskmgr.check_finished():
+                    opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
+                    self.pending_announce.append(
+                        {"id": tid, "line": self.taskmgr.announcement(tid) or "", "opened": bool(opened)})
         except Exception as e:
             self.log_event("announce_error", err=repr(e)[:120])
+        if not self.pending_announce:
             return
-        for tid in done:
-            line = self.taskmgr.announcement(tid)
-            if not line:
-                continue
-            gen = self.gen
-            wav = await self._speak(line)
-            if wav and self.gen == gen and not self.in_speech:
-                self.playing = True
-                await self._play_pcm(_wav_pcm(wav), gen)
-                self.playing = False
-            opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
-            self.log_event("announce", id=tid, line=line, opened=opened)
+        item = self.pending_announce[0]
+        line = self.chatbrain.speakable(item["line"])
+        if not line:
+            self.pending_announce.pop(0)
+            return
+        gen = self.gen
+        wav = await self._speak(line)
+        if not wav or self.gen != gen or self.in_speech:
+            return   # busy: keep it queued, retry on the next idle tick
+        self.playing = True
+        await self._play_pcm(_wav_pcm(wav), gen)
+        self.playing = False
+        if self.gen == gen:
+            self.pending_announce.pop(0)
+            self.log_event("announce", id=item["id"], line=line, opened=item["opened"])
 
     # ---- brain -----------------------------------------------------------
     def _set_timer_local(self, secs: int, label: str) -> str:
@@ -715,7 +740,26 @@ class WatsonAgent(FrameProcessor):
         return f"Timer set for {nice} — {label}."
 
     async def _delegate(self, rest: str, gen: int, user_text: str = "") -> str:
-        """Submit the task to the sandboxed Hermes agent; speak a natural ack."""
+        """Submit the task to the sandboxed agent; speak a natural ack.
+        Pi: over MCP to the Mac task server (the agent runs there, in
+        ~/sandbox). Mac without ME3_TASKS_MCP: tasks.py locally."""
+        if mcp_client.enabled():
+            try:
+                raw = await asyncio.to_thread(mcp_client.call, "submit_task", 15.0,
+                                              request=rest)
+                res = json.loads(raw)
+                tid, ack = res.get("id"), res.get("ack") or "On it."
+            except Exception as e:
+                tid, ack = None, "Sorry, I couldn't reach my agent just now."
+                self.log_event("delegate_failed", err=repr(e)[:120], task=rest[:80])
+            self.log_event("delegated", user=user_text, task=rest[:80],
+                           tid=str(tid)[:40], via="mcp")
+            wav = await self._speak(ack)
+            if wav and self.gen == gen:
+                self.playing = True
+                await self._play_pcm(_wav_pcm(wav), gen)
+                self.playing = False
+            return ack
         try:
             running = len(self.taskmgr.list_running())
         except Exception:
@@ -1121,6 +1165,10 @@ class WatsonAgent(FrameProcessor):
         return (r.json() or {}).get("text", "")
 
     async def _speak(self, text: str):
+        # never read a file path, file name or URL aloud (user rule, Nov 6)
+        text = self.chatbrain.speakable(text)
+        if not text:
+            return None
         if ME3_TTS == "dgx3":
             r = await self.http.post(
                 f"{DGX3}:8001/v1/audio/speech",

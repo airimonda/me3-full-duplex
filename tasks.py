@@ -13,7 +13,9 @@ import subprocess
 import time
 
 TASKS_DIR = os.path.expanduser("~/sandbox")   # the ONE folder agents may control
-SANDBOX_PROFILE = os.path.expanduser("~/me3/hermes-sandbox.sb")
+# the profile that ships next to this file (not a hard-coded ~/me3 copy)
+SANDBOX_PROFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "hermes-sandbox.sb")
 MAX_TURNS = int(os.environ.get("ME3_TASK_MAX_TURNS", "40"))
 RUN_BUDGET_S = int(os.environ.get("ME3_TASK_BUDGET", "900"))  # 15 min per task
 MAX_CONCURRENT = int(os.environ.get("ME3_MAX_TASKS", "2"))    # background slots
@@ -67,7 +69,8 @@ def submit_task(restatement):
     if os.path.exists(SANDBOX_PROFILE):
         # kernel-level confinement: file writes denied outside ~/sandbox,
         # agent runtime dirs (~/.pi, ~/.hermes) and system temp
-        cmd = ["sandbox-exec", "-f", SANDBOX_PROFILE] + cmd
+        cmd = ["sandbox-exec", "-D", "HOME=" + os.path.expanduser("~"),
+               "-f", SANDBOX_PROFILE] + cmd
     env = dict(os.environ)
     if "OPENROUTER_API_KEY" not in env:
         keyfile = os.path.expanduser("~/.hermes/.env")
@@ -146,8 +149,17 @@ def _shorten(s, n=110):
 def _thing(prompt):
     """A short, human way to refer to the task's subject, e.g. 'the Tokyo itinerary site'."""
     s = re.sub(r"^you want\s*", "", prompt.strip(), flags=re.I)
+    # "research the history of X" -> "the history of X"
+    s = re.sub(r"^(please\s+)?(research|build|make|create|write|draft|design|"
+               r"plan|find|look up|put together|prepare|summari[sz]e)\s+(me\s+)?",
+               "", s, flags=re.I)
     s = re.sub(r"^(a|an|the)\s+", "", s, flags=re.I)
-    s = re.sub(r"\b(website|site|page|game|app)\b.*$", r"\1", s, flags=re.I)
+    # cut after the thing's noun; prefer website/site/game/app over "page"
+    # so "a one-page website that says hi" -> "the one-page website"
+    if re.search(r"\b(website|site|game|app)\b", s, flags=re.I):
+        s = re.sub(r"\b(website|site|game|app)\b.*$", r"\1", s, flags=re.I)
+    else:
+        s = re.sub(r"(?<!-)\bpage\b.*$", "page", s, flags=re.I)
     words = s.split()
     return "the " + " ".join(words[:8]) if words else "your request"
 

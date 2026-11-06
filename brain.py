@@ -4,6 +4,7 @@ Moved out of chat.py (deprecated) on 2026-11-05. pipecat_assistant.py
 imports this module; it has no audio or loop code, so it loads on the Pi
 without sounddevice or torch.
 """
+import re
 import time
 
 import home  # noqa: E402  (Spotify + virtual smart home)
@@ -79,6 +80,35 @@ QUICK_TOOLS = [
 ]
 
 
+_URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.I)
+# "~/anything" or an absolute path with 2+ segments ("24/7", "and/or" survive)
+_PATH_RE = re.compile(r"~/[\w.\-/]*|(?<!\w)/[\w.\-]+(?:/[\w.\-]+)+/?")
+_FILE_RE = re.compile(r"\b[\w\-]+\.(?:html?|css|js|py|txt|md|json|pdf|png|jpe?g|csv|sb|log)\b", re.I)
+
+
+def speakable(text: str) -> str:
+    """Strip what must never be read aloud: URLs, file paths, file names.
+    ('Saved to ~/sandbox/task07/index.html' -> 'Saved to')"""
+    t = _URL_RE.sub("", text or "")
+    t = _PATH_RE.sub("", t)
+    t = _FILE_RE.sub("", t)
+    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
+    t = re.sub(r"\(\s*\)|\[\s*\]", "", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
+def local_web_search(query: str) -> str:
+    try:
+        from ddgs import DDGS
+        results = DDGS().text(query, max_results=5, region="wt-wt")
+        if not results:
+            return "No results found."
+        lines = [f"- {r.get('title','')}: {r.get('body','')[:200]}" for r in results]
+        return "Web results:\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Search failed: {e}"
+
+
 def execute_tool(name, args):
     import datetime
     if name == "get_time":
@@ -110,16 +140,18 @@ def execute_tool(name, args):
         return (f"The current time in {city.title()} is "
                 f"{now.strftime('%H:%M on %A, %B %d, %Y')} (zone: {tzname}).")
     if name == "web_search":
-        try:
-            from ddgs import DDGS
-            query = args.get("query", "")
-            results = DDGS().text(query, max_results=5, region="wt-wt")
-            if not results:
-                return "No results found."
-            lines = [f"- {r.get('title','')}: {r.get('body','')[:200]}" for r in results]
-            return "Web results:\n" + "\n".join(lines)
-        except Exception as e:
-            return f"Search failed: {e}"
+        query = args.get("query", "")
+        # Pi: hand unknown facts to the Mac's browser tool (tasks_mcp.py),
+        # which also shows the search on the demo screen. The Pi venv has
+        # no ddgs, so local search is only the Mac/fallback path.
+        import mcp_client
+        if mcp_client.enabled():
+            try:
+                return mcp_client.call("browse", timeout=25.0, query=query)
+            except Exception as e:
+                local = local_web_search(query)
+                return local if not local.startswith("Search failed") else f"Search failed: {e}"
+        return local_web_search(query)
     if name == "set_timer":
         # timers must speak through the caller's own audio path:
         # pipecat_assistant intercepts set_timer (_set_timer_local)
