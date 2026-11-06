@@ -136,7 +136,8 @@ _WAKE_WORDS = {
 _WAKE_PAIRS = {
     ("watch", "on"), ("what's", "on"), ("whats", "on"), ("what", "son"),
     ("what", "sun"), ("watts", "on"), ("watt", "son"), ("wat", "son"),
-    ("watch", "son"), ("wash", "on"),
+    ("watch", "son"), ("wash", "on"), ("that's", "on"), ("thats", "on"),
+    ("that", "son"),
 }
 _WAKE_LEAD = {"hey", "hi", "ok", "okay", "yo", "hello", "oh", "um", "uh", "ah"}
 _WAKE_FUZZ = 0.8

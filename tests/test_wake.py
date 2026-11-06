@@ -29,6 +29,7 @@ WAKE = [
     ("Watsun, lights off", "lights off"),
     ("Wason, set a timer", "set a timer"),
     ("What son, stop", "stop"),
+    ("That's on.", ""), ("Thats on, what time is it", "what time is it"),
 ]
 NOT_WAKE = [
     "What's the time?", "What is the weather like", "Wait", "Wait a second",
