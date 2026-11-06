@@ -203,6 +203,13 @@ def _thing(prompt):
                r"plan|find|look up|put together|prepare|summari[sz]e)\s+(me\s+)?",
                "", s, flags=re.I)
     s = re.sub(r"^(a|an|the)\s+", "", s, flags=re.I)
+    # "a one-page website about Manila street food" -> "the Manila street food website"
+    m = re.search(r"\b(website|site|game|app|page)\s+(?:about|on|for)\s+([^,.;]+)", s, flags=re.I)
+    if m and len(m.group(2).split()) <= 5:
+        topic = m.group(2).strip()
+        if re.match(r"(my|our)\s", topic, flags=re.I):   # "for my bakery" -> "your bakery page"
+            return f"your {topic.split(None, 1)[1]} {m.group(1).lower()}"
+        return f"the {topic} {m.group(1).lower()}"
     # cut after the thing's noun; prefer website/site/game/app over "page"
     # so "a one-page website that says hi" -> "the one-page website"
     if re.search(r"\b(website|site|game|app)\b", s, flags=re.I):

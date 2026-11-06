@@ -29,12 +29,18 @@ if cos < 0.99 or abs(np.linalg.norm(b) - 1) > 1e-4:
     print("FAIL blend moved the profile too far or is not unit length")
 
 
+# near-miss voice: cosine 0.65 to the owner (the gate now embeds once and
+# computes the cosine itself, off the event loop)
+_orth = other - np.dot(other, owner) * owner
+_orth /= np.linalg.norm(_orth)
+near = (0.65 * owner + np.sqrt(1 - 0.65 ** 2) * _orth).astype(np.float32)
+
+
 class StubSpk:
     saved = []
-    def similarity(self, pcm, prof): return 0.65          # near-miss zone
     def near_threshold(self): return 0.60
     def threshold(self): return 0.72
-    def embed(self, pcm): return other
+    def embed(self, pcm): return near
     def voiced_seconds(self, pcm): return 3.0
     def save_profile(self, emb): self.saved.append(np.array(emb))
 

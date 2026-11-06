@@ -905,7 +905,13 @@ class WatsonAgent(FrameProcessor):
                 # it would supersede the in-flight reply and kill it
                 return
             elif self.speaker is not None:
-                sim = self.spk.similarity(norm, self.speaker)
+                # one embedding, off the event loop: on the Pi 4 resemblyzer
+                # takes seconds, and doing it inline (plus a second embed for
+                # the refresh) stalled ASR and barge-in (Nov 6: 12.6 s from
+                # transcript to LLM call)
+                emb = await asyncio.to_thread(self.spk.embed, norm)
+                sim = (float(np.dot(emb, self.speaker) / (np.linalg.norm(emb) * np.linalg.norm(self.speaker) + 1e-9))
+                       if emb is not None else -1.0)
                 if sim < 0.0:
                     # embed failed (too quiet/short): fail OPEN, never lock out
                     self.log_event("voice_gate_unavailable", user=text)
@@ -916,7 +922,6 @@ class WatsonAgent(FrameProcessor):
                     # near-miss: accept, but only refresh the profile from
                     # wake-prefixed commands (definitely the owner speaking)
                     if no_gate:
-                        emb = self.spk.embed(norm)
                         if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
                             # blend, never replace: on Nov 6 one short "Watson
                             # lights off" overwrote the profile and the owner
@@ -927,7 +932,7 @@ class WatsonAgent(FrameProcessor):
             elif (is_wake and len(utt_pcm) > _IN_SR * 2):
                 # no profile yet: enroll ONLY a wake-prefixed speaker, so a
                 # stranger (or the TV) can never claim the profile by talking
-                emb = self.spk.embed(norm)
+                emb = await asyncio.to_thread(self.spk.embed, norm)
                 if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
                     self.spk.save_profile(emb)
                     self.speaker = emb
@@ -945,6 +950,11 @@ class WatsonAgent(FrameProcessor):
             await self.push_frame(InterruptionFrame(), direction=FrameDirection.DOWNSTREAM)
             self.log_event("superseded")
         self.respond_task = asyncio.current_task()
+        # take the generation AFTER superseding: the gen read at the top of
+        # _respond is stale once we bumped it, and our own stream would then
+        # quit on its first line (Nov 6 Pi: both "build me a website" turns
+        # ended silent 1 ms after llm_http)
+        gen = self.gen
         # --- direct handoff: "have the agent do X" skips the LLM entirely ---
         m = re.search(r"have the agent\s+(?:do\s+|build\s+|make\s+|create\s+|write\s+|fix\s+|research\s+|find\s+|set\s+up\s+)?(.+)", text, re.I)
         if not m:
