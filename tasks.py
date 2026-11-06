@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 TASKS_DIR = os.path.expanduser("~/sandbox")   # the ONE folder agents may control
@@ -42,13 +43,57 @@ def _task_prompt(restatement):
     )
 
 
+def _which(name):
+    """Agent CLIs install to ~/.local/bin, which a service PATH may lack."""
+    found = shutil.which(name)
+    if found:
+        return found
+    local = os.path.expanduser(f"~/.local/bin/{name}")
+    return local if os.path.exists(local) else name
+
+
+def _sandboxed(cmd, tdir):
+    """Confine the agent: it may write only in ~/sandbox, its own runtime
+    dirs and temp. Mac: sandbox-exec + hermes-sandbox.sb. Linux (the Pi):
+    bubblewrap, with the whole filesystem read-only except those binds."""
+    home = os.path.expanduser("~")
+    if sys.platform == "darwin" and shutil.which("sandbox-exec") and os.path.exists(SANDBOX_PROFILE):
+        return ["sandbox-exec", "-D", "HOME=" + home, "-f", SANDBOX_PROFILE] + cmd
+    if shutil.which("bwrap"):
+        writable = [TASKS_DIR] + [os.path.join(home, d) for d in
+                                  (".pi", ".hermes", ".npm", ".cache", ".local/share/pi-node")]
+        args = ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+                "--tmpfs", "/tmp", "--unshare-pid", "--die-with-parent"]
+        for w in writable:
+            if os.path.isdir(w):
+                args += ["--bind", w, w]
+        return args + ["--chdir", tdir, "--"] + cmd
+    print("[tasks] WARNING: no sandbox available, running unconfined", flush=True)
+    return cmd
+
+
+def open_url(target):
+    """Show a file or URL on the demo screen: Mac `open`; on the Pi, Chromium
+    on the HDMI desktop (DISPLAY=:0)."""
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", target])
+        return True
+    env = dict(os.environ, DISPLAY=os.environ.get("DISPLAY") or ":0")
+    browser = shutil.which("chromium") or shutil.which("chromium-browser")
+    cmd = [browser, "--new-window", target] if browser else ["xdg-open", target]
+    subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    return True
+
+
 def submit_task(restatement):
     """Start a background Hermes run. Returns task id, or None if at capacity."""
     if len(_running) >= MAX_CONCURRENT:
         return None
     os.makedirs(TASKS_DIR, exist_ok=True)
-    n = len([d for d in os.listdir(TASKS_DIR) if d.startswith("task")]) + 1
-    tid = f"task{n:02d}"
+    nums = [int(d[4:]) for d in os.listdir(TASKS_DIR)
+            if d.startswith("task") and d[4:].isdigit()]
+    tid = f"task{(max(nums) + 1 if nums else 1):02d}"
     tdir = os.path.join(TASKS_DIR, tid)
     os.makedirs(tdir, exist_ok=True)
     prompt_path = os.path.join(tdir, "prompt.txt")
@@ -58,27 +103,28 @@ def submit_task(restatement):
     logf = open(log_path, "w")
     harness = os.environ.get("ME3_HARNESS", "pi")
     if harness == "hermes":
-        cmd = ["hermes", "chat", "--oneshot", "--query-file", prompt_path,
+        cmd = [_which("hermes"), "chat", "--oneshot", "--query-file", prompt_path,
                "--in", tdir, "--max-turns", str(MAX_TURNS),
                "--run-budget", str(RUN_BUDGET_S)]
     else:
         agent_model = os.environ.get("ME3_AGENT_MODEL", "z-ai/glm-5.3-flash")
         prompt_text = open(prompt_path).read().strip()
-        cmd = ["pi", "-p", "--provider", "openrouter", "--model", agent_model,
+        cmd = [_which("pi"), "-p", "--provider", "openrouter", "--model", agent_model,
                "--no-session", "--", prompt_text]
-    if os.path.exists(SANDBOX_PROFILE):
-        # kernel-level confinement: file writes denied outside ~/sandbox,
-        # agent runtime dirs (~/.pi, ~/.hermes) and system temp
-        cmd = ["sandbox-exec", "-D", "HOME=" + os.path.expanduser("~"),
-               "-f", SANDBOX_PROFILE] + cmd
+    cmd = _sandboxed(cmd, tdir)
     env = dict(os.environ)
     if "OPENROUTER_API_KEY" not in env:
-        keyfile = os.path.expanduser("~/.hermes/.env")
-        if os.path.exists(keyfile):
+        # Mac: ~/.hermes/.env; Pi: ~/me3/.env (never copied between machines)
+        for keyfile in ("~/.hermes/.env", "~/me3/.env"):
+            keyfile = os.path.expanduser(keyfile)
+            if not os.path.exists(keyfile):
+                continue
             for line in open(keyfile):
                 if line.startswith("OPENROUTER_API_KEY="):
-                    env["OPENROUTER_API_KEY"] = line.strip().split("=", 1)[1]
+                    env["OPENROUTER_API_KEY"] = line.strip().split("=", 1)[1].strip('"')
                     break
+            if "OPENROUTER_API_KEY" in env:
+                break
     proc = subprocess.Popen(
         cmd,
         stdout=logf, stderr=subprocess.STDOUT,
@@ -191,7 +237,7 @@ def open_deliverable(tid):
     if not path:
         return None
     try:
-        subprocess.Popen(["open", path])
+        open_url(path)
         return path
     except Exception as e:
         print(f"[tasks] open failed for {path}: {e}", flush=True)

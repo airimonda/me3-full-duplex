@@ -1,9 +1,9 @@
-"""Watson task MCP server (runs on the Mac executor).
+"""Watson task MCP server (runs on the Raspberry Pi, next to the voice loop).
 
 The Pi voice loop hands big jobs to this server and keeps talking while
 they run. Every job runs through tasks.py: a pi.dev agent under
 sandbox-exec, writing ONLY inside ~/sandbox/taskNN. When a job finishes, a
-watcher thread opens its deliverable on the Mac screen at once and queues a
+watcher thread opens its deliverable on the Pi screen (Chromium, :0) and queues a
 spoken announcement (no file paths, no URLs) for the Pi to collect.
 
 Tools
@@ -13,7 +13,7 @@ Tools
   browse(query)         web search for facts the talker does not know: opens
                         the results in the Mac browser and returns snippets
 
-Run (Mac):  ./venv/bin/python tasks_mcp.py            # http://0.0.0.0:8320/mcp
+Run (Pi):  ~/mcp-venv/bin/python ~/me3/tasks_mcp.py   # http://127.0.0.1:8320/mcp
 Env: ME3_TASKS_MCP_PORT (8320), ME3_BROWSE_OPEN=0 to skip opening the browser.
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ import tasks  # noqa: E402
 from brain import speakable  # noqa: E402
 
 PORT = int(os.environ.get("ME3_TASKS_MCP_PORT", "8320"))
-HOST = os.environ.get("ME3_TASKS_MCP_HOST", "0.0.0.0")
+HOST = os.environ.get("ME3_TASKS_MCP_HOST", "127.0.0.1")   # same box as Watson
 BROWSE_OPEN = os.environ.get("ME3_BROWSE_OPEN", "1") != "0"
 
 _lock = threading.Lock()
@@ -85,7 +85,7 @@ def do_browse(query: str) -> str:
     if BROWSE_OPEN:
         url = "https://duckduckgo.com/?q=" + urllib.parse.quote_plus(query)
         try:
-            subprocess.Popen(["open", url])
+            tasks.open_url(url)
         except Exception as e:
             log("browser open failed:", repr(e))
     import brain

@@ -1118,7 +1118,9 @@ class WatsonAgent(FrameProcessor):
                 delegate_rest = False
                 await one_pass(self.history, False)
             if delegate_rest:
-                rest = reply.split("DELEGATE:", 1)[1].strip().rstrip(".!")
+                # first line only: the talker may add a spoken line after it
+                rest = reply.split("DELEGATE:", 1)[1].strip().splitlines()[0].strip().rstrip(".!") \
+                    if reply.split("DELEGATE:", 1)[1].strip() else ""
                 if rest:
                     ack = await self._delegate(rest, gen, user_text=text)
                     reply = ack
