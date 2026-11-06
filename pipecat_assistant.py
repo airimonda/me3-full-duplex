@@ -333,6 +333,7 @@ _ENDPOINT_MS = 600
 _MIN_UTT_MS = 250
 _PREROLL_MS = int(os.environ.get("ME3_PREROLL_MS", "400"))   # audio kept before VAD onset
 _PREROLL_BYTES = _IN_SR * 2 * _PREROLL_MS // 1000
+_ANSWER_WINDOW_S = 10.0   # after Watson asks a question, short replies count
 _BARGE_MS = 150
 _SPEAK_THRESH = 0.5
 
@@ -461,6 +462,7 @@ class WatsonAgent(FrameProcessor):
         # idle state (mic mode): last accepted turn / playback / wake word
         self.last_active = time.monotonic()
         self.wake_follow_until = 0.0    # bare wake: next utterance is addressed
+        self.answer_until = 0.0         # Watson asked a question: short answers count
         # speaker enrollment: same profile file as the live loop (chat.py)
         # this file's own folder (~/me3 on the Pi), not a hard-coded ~/me3:
         # a checkout elsewhere must import its own brain.py / tasks.py
@@ -970,7 +972,9 @@ class WatsonAgent(FrameProcessor):
             # wake-prefixed: count the whole utterance ("Watson, lights off"
             # is addressed and long enough to embed, not a fragment)
             words = (heard if is_wake else text).split()
-            fragment = not followup and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
+            # a short answer to Watson's own question ("halo-halo") is not a fragment
+            answering = time.monotonic() < self.answer_until
+            fragment = not followup and not answering and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
                 # mic mode: a fragment ("we", "okay") must not spawn a response —
@@ -1238,6 +1242,10 @@ class WatsonAgent(FrameProcessor):
             if reply.strip():
                 self._collapse_tools(user_msg)
                 self.history.append({"role": "assistant", "content": reply})
+                if self.gen == gen and reply.rstrip().endswith("?"):
+                    # Watson asked something: a 1-2 word answer within 10 s
+                    # is a reply, not a fragment (Nov 6: "halo-halo" dropped)
+                    self.answer_until = time.monotonic() + _ANSWER_WINDOW_S
             ft = max(0.0, (first_token or t_asr) - t0)
             fa = max(0.0, (first_audio if first_audio is not None else total) - t0)
             self.log_event("turn", user=text, reply=reply,
