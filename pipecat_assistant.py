@@ -48,8 +48,17 @@ TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_michael")
 FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
-ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
-ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3
+ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3 | deepgram
+ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3 | deepgram
+# Deepgram (owner's choice, Nov 6): cloud ASR + TTS straight from the Pi, so
+# the voice path no longer needs the Mac. Key: DEEPGRAM_API_KEY in the env,
+# ~/.hermes/.env (Mac) or ~/me3/.env (Pi); never logged.
+DG_URL = "https://api.deepgram.com/v1"
+DG_ASR_MODEL = os.environ.get("ME3_DG_ASR_MODEL", "nova-3")
+# Aura-2 voice; keep it far from the owner's voice (echo rejection by identity)
+DG_VOICE = os.environ.get("ME3_DG_VOICE", "aura-2-orion-en")
+# nova-3 keyterm prompting: bias recognition toward the wake word
+DG_KEYTERMS = [k for k in os.environ.get("ME3_DG_KEYTERMS", "Watson").split(",") if k]
 DGX3 = os.environ.get("DGX3_HOST", "")         # e.g. http://10.x.x.x; empty = local backends only
 DGX3_ASR_MODEL = "Qwen/Qwen2-Audio-7B-Instruct"
 DGX3_TTS_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
@@ -330,6 +339,37 @@ def _openrouter_key() -> str | None:
     return None
 
 
+def _env_key(name: str) -> str | None:
+    v = os.environ.get(name)
+    if v:
+        return v.strip()
+    for path in (Path.home() / ".hermes" / ".env", Path.home() / "me3" / ".env"):
+        if path.exists():
+            for line in path.read_text().splitlines():
+                if line.startswith(name + "="):
+                    return line.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def _dg_speak_request(text: str):
+    """(url, headers, json) for Deepgram Aura TTS -> 24 kHz mono WAV."""
+    url = (f"{DG_URL}/speak?model={DG_VOICE}&encoding=linear16"
+           f"&sample_rate={_OUT_SR}&container=wav")
+    return url, {"Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}"}, {"text": text}
+
+
+def _tts_sync(text: str, voice: str | None = None) -> bytes:
+    """Blocking TTS for start-up work (Watson's own voice embedding)."""
+    if ME3_TTS == "deepgram":
+        url, hdr, body = _dg_speak_request(text)
+        r = httpx.post(url, headers=hdr, json=body, timeout=60)
+    else:
+        r = httpx.post(SERVER + "/speak", timeout=60,
+                       json={"voice": voice or TTS_VOICE, "text": text})
+    r.raise_for_status()
+    return r.content
+
+
 def _wav_bytes(pcm16: bytes, sr: int) -> bytes:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
@@ -449,13 +489,13 @@ class WatsonAgent(FrameProcessor):
         if self.mode != "mic":
             return
         try:
-            r = httpx.post(SERVER + "/speak", timeout=60, json={"voice": TTS_VOICE,
-                "text": "The Eiffel Tower was built in Paris for the World Fair. "
-                        "Sure, I can help with that, it is three in the afternoon."})
-            a = np.frombuffer(_wav_pcm(r.content), dtype=np.int16)
+            wav = _tts_sync("The Eiffel Tower was built in Paris for the World Fair. "
+                            "Sure, I can help with that, it is three in the afternoon.")
+            a = np.frombuffer(_wav_pcm(wav), dtype=np.int16)
             a = _resample(a, _OUT_SR, _IN_SR) / 32768.0
             self.watson_emb = self.spk.embed((a / (np.abs(a).max() + 1e-9)).astype(np.float32))
-            self.log_event("watson_voice_ready", voice=TTS_VOICE,
+            self.log_event("watson_voice_ready",
+                           voice=DG_VOICE if ME3_TTS == "deepgram" else TTS_VOICE,
                            sim_owner=(round(float(np.dot(self.watson_emb, self.speaker)), 3)
                                       if self.speaker is not None else None))
         except Exception as e:
@@ -470,8 +510,11 @@ class WatsonAgent(FrameProcessor):
             return
         self.log_event("prompt_after_stop")
         try:
-            r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
-            wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
+            if ME3_TTS == "deepgram":
+                wav = await self._speak("Go ahead.")
+            else:
+                r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
+                wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
         except Exception:
             wav = await self._speak("Go ahead.")
         if wav and self.gen == gen and not self.in_speech:
@@ -1175,6 +1218,19 @@ class WatsonAgent(FrameProcessor):
                            total_s=round(total, 3))
 
     async def _asr(self, pcm16: bytes) -> str:
+        if ME3_ASR == "deepgram":
+            params = [("model", DG_ASR_MODEL), ("language", "en"), ("smart_format", "true")]
+            params += [("keyterm", k) for k in DG_KEYTERMS]
+            r = await self.http.post(
+                f"{DG_URL}/listen", params=params, content=_wav_bytes(pcm16, _IN_SR),
+                headers={"Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}",
+                         "Content-Type": "audio/wav"})
+            if r.status_code != 200:
+                self.log_event("asr_error", backend="deepgram", status=r.status_code,
+                               body=r.text[:120])
+                return ""
+            alt = r.json()["results"]["channels"][0]["alternatives"][0]
+            return (alt.get("transcript") or "").strip()
         if ME3_ASR == "dgx3":
             b64 = base64.b64encode(_wav_bytes(pcm16, _IN_SR)).decode()
             r = await self.http.post(
@@ -1199,6 +1255,17 @@ class WatsonAgent(FrameProcessor):
         text = self.chatbrain.speakable(text)
         if not text:
             return None
+        if ME3_TTS == "deepgram":
+            self.spoken_tokens |= _token_set(text)
+            mark("tts_request")
+            url, hdr, body = _dg_speak_request(text)
+            r = await self.http.post(url, headers=hdr, json=body)
+            if r.status_code != 200:
+                self.log_event("tts_error", backend="deepgram", status=r.status_code,
+                               body=r.text[:120])
+                return None
+            mark("tts_first_audio")
+            return r.content
         if ME3_TTS == "dgx3":
             r = await self.http.post(
                 f"{DGX3}:8001/v1/audio/speech",
