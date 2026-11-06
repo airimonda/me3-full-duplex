@@ -92,6 +92,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
   <ul class="check">
     <li><span>The Mac and the Pi are on the same network. Check the Mac server: <code>curl -s localhost:8300/health</code> should print 200-style JSON.</span></li>
     <li><span>Watson is running on the Pi: <code>ssh watsonpi 'pgrep -fl pipecat_assistant'</code> shows one process. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_live.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>The task server is running on the Pi: <code>ssh watsonpi 'pgrep -fl tasks_mcp'</code>. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_tasks_mcp.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
     <li><span>Wait 2 minutes after any restart. The voice model loads for about 100 s, and speech recognition is slow until it finishes.</span></li>
     <li><span>Say <span class="voice">"Watson"</span> once. You should hear "Yes? I'm listening." in the male am_michael voice.</span></li>
     <li><span>If Watson ignores you (log shows <code>stranger_ignored</code>), restore your voice profile, then restart Watson:</span></li>
@@ -111,7 +112,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 <section>
   <h2><span class="t">0:30 · 60 s</span> How it works</h2>
   <div class="say">
-    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. My Mac is the brain. It runs Whisper for speech recognition and Kokoro for the voice, and it calls a fast language model, GLM 5.3 Flash, for replies and tool calls. Everything is one Pipecat pipeline.</p>
+    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. My Mac is the brain. It runs Whisper for speech recognition and Kokoro for the voice, and it calls a fast language model, GLM 5.3 Flash, for replies and tool calls. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and opens the result on screen when it's done.</p>
     <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. Whisper hears "Watson" as "button", "Hudson" or "what's on", so the wake word is tuned to the mishearings in our own logs.</p>
   </div>
 </section>
@@ -131,22 +132,41 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     </div>
 
     <div class="step">
-      <div class="step-head"><b>2. A fact it must not make up</b><span class="pill ok">tool: get_time_in</span></div>
+      <div class="step-head"><b>2. Start a big task</b><span class="pill ok">verified on the Pi Nov 6 (MCP)</span></div>
       <dl class="grid3">
-        <dt>Say</dt><dd><span class="voice">"Watson, what time is it in Tokyo?"</span></dd>
-        <dt>Expect</dt><dd>The real Tokyo time, from a time-zone tool, not the model's guess.</dd>
-        <dt>Tell class</dt><dd>Facts come from tools. Unknown facts go to web search, and the model never invents them.</dd>
-        <dt>If it fails</dt><dd>Wait 7 s before repeating. The reply can take 4 to 7 s to start.</dd>
+        <dt>Say</dt><dd><span class="voice">"Watson, build me a one-page website about Manila street food."</span></dd>
+        <dt>Expect</dt><dd>"On it. I'll let you know when it's done." The job goes to our task MCP server on the Pi, which runs the pi.dev agent in a sandbox folder.</dd>
+        <dt>Tell class</dt><dd>The agent can only write inside its sandbox folder. Watson stays free while it works.</dd>
+        <dt>If it fails</dt><dd>If Watson asks what the site is about, answer in one sentence. If it says it can't reach the agent, run the restart line from the checklist.</dd>
       </dl>
     </div>
 
     <div class="step">
-      <div class="step-head"><b>3. Smart home</b><span class="pill ok">verified live Nov 6</span></div>
+      <div class="step-head"><b>2b. A fact it must not make up, while the task runs</b><span class="pill ok">web search on the Pi</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson, who won the 2026 NBA finals?"</span></dd>
+        <dt>Expect</dt><dd>The search opens in the Pi's browser, and Watson answers from the results.</dd>
+        <dt>Tell class</dt><dd>When the model doesn't know, it looks it up instead of guessing. The big task is still running.</dd>
+        <dt>If it fails</dt><dd>Wait 7 s before repeating. Replies can take 4 to 7 s to start.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>3. Smart home, while the task runs</b><span class="pill ok">verified live Nov 6</span></div>
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, turn the living room lights off."</span></dd>
         <dt>Expect</dt><dd>"Done, lights are off." The state changes in the virtual home and on the dashboard.</dd>
         <dt>Tell class</dt><dd>Even "Watson ... lights off" with a pause works. The sentence right after the wake word counts as addressed.</dd>
         <dt>If it fails</dt><dd>Repeat as one breath: <span class="voice">"Watson, lights off."</span></dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>3b. The big task finishes</b><span class="pill ok">verified on the Pi Nov 6</span></div>
+      <dl class="grid3">
+        <dt>Expect</dt><dd>At the next quiet moment: "Done! The Manila street food website is ready — take a look." The page opens on the Pi's screen by itself.</dd>
+        <dt>Tell class</dt><dd>It waits until nobody is talking, and it never reads out a file path.</dd>
+        <dt>If it fails</dt><dd>Keep talking; the announcement stays queued and plays at the next pause.</dd>
       </dl>
     </div>
 
