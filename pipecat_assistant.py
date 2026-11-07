@@ -448,6 +448,7 @@ class WatsonAgent(FrameProcessor):
         self.play_task = None
         self.respond_task = None   # in-flight _respond coroutine (for supersede)
         self.asr_live = None       # _DGLive session of the utterance in progress
+        self.asr_spare = None      # pre-connected _DGLive for the next onset
         self.ack_pcm = {}          # tool-ack phrase -> PCM (filled on first use)
         self.ack_i = 0
         self.key = _openrouter_key()
@@ -616,6 +617,9 @@ class WatsonAgent(FrameProcessor):
         from pipecat.frames.frames import InterruptionFrame
         from pipecat.processors.frame_processor import FrameDirection
         pcm = samples.tobytes()
+        if (self.asr_spare is None and self.asr_live is None
+                and ASR_STREAM and ME3_ASR == "deepgram"):
+            self.asr_spare = _DGLive(self)   # first spare (later ones: _live_open)
         state = await self.vad.analyze_audio(pcm)
         ms = len(samples) / _IN_SR * 1000
         rms = float(np.sqrt(np.mean((samples.astype(np.float32) / 32768.0) ** 2)) + 1e-9)
@@ -1326,9 +1330,19 @@ class WatsonAgent(FrameProcessor):
             self.asr_live = None
         if not (ASR_STREAM and ME3_ASR == "deepgram"):
             return
-        self.asr_live = _DGLive(self)
+        # take the pre-connected spare: a socket opened at onset needs ~1 s
+        # (TLS + Deepgram setup on the Pi), so a short phrase reached
+        # Deepgram in one late burst and its transcript lagged the endpoint
+        # by 0.4-1.0 s (bench 2026-11-07_08-41-31)
+        live, self.asr_spare = self.asr_spare, None
+        if live is None or live.done.is_set():
+            if live is not None:
+                live.cancel()
+            live = _DGLive(self)
+        self.asr_live = live
         if first:
-            self.asr_live.feed(first)
+            live.feed(first)
+        self.asr_spare = _DGLive(self)   # ready for the next utterance
 
     def _live_feed(self, pcm: bytes):
         if self.asr_live is not None:
@@ -1680,7 +1694,13 @@ class _DGLive:
                         self.ok = True
                 reader = asyncio.create_task(read())
                 while True:
-                    item = await self.q.get()
+                    try:
+                        item = await asyncio.wait_for(self.q.get(), 4.0)
+                    except asyncio.TimeoutError:
+                        # idle spare: Deepgram closes a socket after ~10 s
+                        # without audio or a KeepAlive
+                        await ws.send(json.dumps({"type": "KeepAlive"}))
+                        continue
                     if item is _LIVE_CANCEL:
                         return
                     if item is _LIVE_FIN:
