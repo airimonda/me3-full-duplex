@@ -19,17 +19,23 @@ import re
 import sys
 import time
 
-sys.path.insert(0, os.path.expanduser("~/me3"))
+ME3 = os.path.dirname(os.path.abspath(__file__))   # ~/me3 on the Pi
+sys.path.insert(0, ME3)
 import home  # noqa: E402
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-ME3 = os.path.expanduser("~/me3")
-LOG_PATH = os.path.join(ME3, "chat_log.jsonl")
+# Runs on the Pi next to Watson; the owner views it from the Mac at
+# http://<pi>:8301. Conversation comes from the live voice loop's log
+# (pipecat_assistant.py); the legacy chat_log.jsonl is the fallback.
+_LIVE_LOG = os.path.join(ME3, "runs", "live", "watson_log.jsonl")
+LOG_PATH = os.environ.get("ME3_UI_LOG") or (
+    _LIVE_LOG if os.path.exists(_LIVE_LOG) else os.path.join(ME3, "chat_log.jsonl"))
+SHOW_LOG = os.path.expanduser(os.environ.get("ME3_SHOW_LOG", "~/me3/runs/live/show.jsonl"))
 HOME_STATE = os.path.expanduser("~/sandbox/home_state.json")
-UI_DIR = os.path.expanduser("~/me3/vcm-me2/runtime/ui")
+UI_DIR = os.path.join(ME3, "vcm-me2", "runtime", "ui")
 SANDBOX = os.path.expanduser("~/sandbox")
 
 app = FastAPI()
@@ -100,7 +106,7 @@ def log_entries():
     """All chat_log.jsonl entries as (t, dict)."""
     out = []
     try:
-        with open(LOG_PATH) as f:
+        with open(LOG_PATH, errors="replace") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -120,6 +126,30 @@ def entries_to_messages(e):
     t = float(e.get("t", time.time()))
     if "event" in e:
         ev = e["event"]
+        # --- live voice loop (pipecat_assistant.py watson_log.jsonl) ---
+        if ev == "turn":
+            reply = {"text": e["reply"]} if e.get("reply") else None
+            return [{"type": "turn", "id": f"t{t}", "t": t,
+                     "heard": {"text": e.get("user", ""), "accepted": True,
+                               "prob": None, "slot": ""}, "reply": reply}]
+        if ev in ("ignored_idle", "stranger_ignored"):
+            why = "wake word missing" if ev == "ignored_idle" else "not the owner's voice"
+            return [{"type": "turn", "id": f"i{t}", "t": t,
+                     "heard": {"text": e.get("user", ""), "accepted": False,
+                               "reason": why}, "reply": None}]
+        if ev == "greeted":
+            return [{"type": "turn", "id": f"g{t}", "t": t,
+                     "heard": {"text": e.get("user", ""), "accepted": True,
+                               "prob": None, "slot": ""},
+                     "reply": {"text": "Yes? I'm listening."}}]
+        if ev == "delegated":
+            return [{"type": "log", "level": "info",
+                     "msg": f"Task started: {e.get('task', '')}"}]
+        if ev == "tool":
+            return [{"type": "log", "level": "info", "msg": f"Tool: {e.get('name', '')}"}]
+        if ev in ("barge_in", "stopped_by_user", "backchannel_resume", "woke"):
+            return [{"type": "log", "level": "info", "msg": ev.replace("_", " ")}]
+        # --- legacy chat.py events ---
         if ev == "idle_ignored":
             return [{"type": "turn", "id": f"i{t}", "t": t,
                      "heard": {"text": e.get("user", ""), "accepted": False,
@@ -131,7 +161,7 @@ def entries_to_messages(e):
             return [{"type": "log", "level": "info", "msg": f"Done: {e.get('line', '')}"}]
         if ev == "auto_search":
             return [{"type": "log", "level": "info", "msg": "Searched the web"}]
-        return [{"type": "log", "level": "info", "msg": str(ev)}]
+        return []   # asr, llm_http, probes, ...: internal, not for the UI
     heard = {"text": e.get("user", ""), "accepted": True, "prob": None, "slot": ""}
     reply = {"text": e.get("reply", "")} if e.get("reply") else None
     return [{"type": "turn", "id": f"t{t}", "t": t, "heard": heard, "reply": reply}]
@@ -154,6 +184,9 @@ async def index(request=None):
 def tasks_scan():
     """Background agent tasks in ~/sandbox/task*/ -> dashboard rows."""
     out = []
+    # finished = Watson announced it (the agent's run.log may stay empty
+    # until it exits, so its mtime says nothing)
+    announced = {e.get("id") for _, e in log_entries() if e.get("event") == "announce"}
     try:
         for name in sorted(os.listdir(SANDBOX), reverse=True):
             d = os.path.join(SANDBOX, name)
@@ -161,7 +194,7 @@ def tasks_scan():
                 continue
             logp = os.path.join(d, "run.log")
             age = time.time() - os.path.getmtime(logp) if os.path.exists(logp) else 1e9
-            status = "working" if age < 30 else "finished"
+            status = "finished" if (name in announced or age > 900) else "working"
             prompt = ""
             try:
                 raw = open(os.path.join(d, "prompt.txt")).read().strip()
@@ -215,6 +248,27 @@ async def api_tool(req: dict):
                          "home": _home_state(), "music": music_real})
 
 
+@app.get("/api/show")
+async def api_show(since: float = 0.0):
+    """Things Watson wants on screen (finished pages, web searches), written by
+    tasks.open_url on the Pi. mac_show.py polls this and opens each one."""
+    out = []
+    try:
+        with open(SHOW_LOG, errors="replace") as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if float(e.get("t", 0)) > since:
+                    if e.get("kind") == "deliverable":
+                        e["path"] = f"/files/{e['task']}/{e['name']}"
+                    out.append(e)
+    except FileNotFoundError:
+        pass
+    return JSONResponse({"events": out, "now": time.time()})
+
+
 @app.get("/files/{task_id}/{name}")
 async def task_file(task_id: str, name: str):
     if not task_id.startswith("task") or "/" in name or name.startswith("."):
@@ -240,7 +294,7 @@ async def ws_dashboard(ws: WebSocket):
             new_offset = _log_offset()
             if new_offset > offset:
                 try:
-                    with open(LOG_PATH) as f:
+                    with open(LOG_PATH, errors="replace") as f:
                         f.seek(offset)
                         new_data = f.read()
                     offset = new_offset

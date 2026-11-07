@@ -6,14 +6,18 @@ Each delegated task is a headless Hermes one-shot run in its own sandbox folder:
 The talker keeps conversing while tasks run. After each conversational turn,
 check_finished() returns newly completed tasks. Only legacy/chat.py announced them; pipecat_assistant.py does not call it yet.
 """
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 TASKS_DIR = os.path.expanduser("~/sandbox")   # the ONE folder agents may control
-SANDBOX_PROFILE = os.path.expanduser("~/me3/hermes-sandbox.sb")
+# the profile that ships next to this file (not a hard-coded ~/me3 copy)
+SANDBOX_PROFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "hermes-sandbox.sb")
 MAX_TURNS = int(os.environ.get("ME3_TASK_MAX_TURNS", "40"))
 RUN_BUDGET_S = int(os.environ.get("ME3_TASK_BUDGET", "900"))  # 15 min per task
 MAX_CONCURRENT = int(os.environ.get("ME3_MAX_TASKS", "2"))    # background slots
@@ -40,13 +44,78 @@ def _task_prompt(restatement):
     )
 
 
+def _which(name):
+    """Agent CLIs install to ~/.local/bin, which a service PATH may lack."""
+    found = shutil.which(name)
+    if found:
+        return found
+    for d in ("~/.local/bin", "~/.pi/agent/bin"):   # pi.dev installer: ~/.pi/agent/bin
+        local = os.path.expanduser(f"{d}/{name}")
+        if os.path.exists(local):
+            return local
+    return name
+
+
+def _sandboxed(cmd, tdir):
+    """Confine the agent: it may write only in ~/sandbox, its own runtime
+    dirs and temp. Mac: sandbox-exec + hermes-sandbox.sb. Linux (the Pi):
+    bubblewrap, with the whole filesystem read-only except those binds."""
+    home = os.path.expanduser("~")
+    if sys.platform == "darwin" and shutil.which("sandbox-exec") and os.path.exists(SANDBOX_PROFILE):
+        return ["sandbox-exec", "-D", "HOME=" + home, "-f", SANDBOX_PROFILE] + cmd
+    if shutil.which("bwrap"):
+        writable = [TASKS_DIR] + [os.path.join(home, d) for d in
+                                  (".pi", ".hermes", ".npm", ".cache", ".local/share/pi-node")]
+        args = ["bwrap", "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+                "--tmpfs", "/tmp", "--unshare-pid", "--die-with-parent"]
+        for w in writable:
+            if os.path.isdir(w):
+                args += ["--bind", w, w]
+        return args + ["--chdir", tdir, "--"] + cmd
+    print("[tasks] WARNING: no sandbox available, running unconfined", flush=True)
+    return cmd
+
+
+SHOW_LOG = os.environ.get("ME3_SHOW_LOG", "").strip()
+
+
+def open_url(target):
+    """Show a file or URL to the user.
+    ME3_SHOW_LOG set (the Pi): append a show event there; ui_server.py serves
+    it and mac_show.py opens it in the Mac browser (owner: whatever happens on
+    the Pi must show on the Mac). Otherwise: Mac `open`, or Chromium on :0."""
+    if SHOW_LOG:
+        ev = {"t": round(time.time(), 3)}
+        sand = os.path.realpath(TASKS_DIR) + os.sep
+        real = os.path.realpath(target) if not target.startswith("http") else ""
+        if real.startswith(sand):           # a deliverable inside ~/sandbox
+            rel = real[len(sand):].split(os.sep)
+            ev.update(kind="deliverable", task=rel[0], name="/".join(rel[1:]))
+        else:
+            ev.update(kind="url", url=target)
+        os.makedirs(os.path.dirname(os.path.expanduser(SHOW_LOG)) or ".", exist_ok=True)
+        with open(os.path.expanduser(SHOW_LOG), "a") as f:
+            f.write(json.dumps(ev) + "\n")
+        return True
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", target])
+        return True
+    env = dict(os.environ, DISPLAY=os.environ.get("DISPLAY") or ":0")
+    browser = shutil.which("chromium") or shutil.which("chromium-browser")
+    cmd = [browser, "--new-window", target] if browser else ["xdg-open", target]
+    subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    return True
+
+
 def submit_task(restatement):
     """Start a background Hermes run. Returns task id, or None if at capacity."""
     if len(_running) >= MAX_CONCURRENT:
         return None
     os.makedirs(TASKS_DIR, exist_ok=True)
-    n = len([d for d in os.listdir(TASKS_DIR) if d.startswith("task")]) + 1
-    tid = f"task{n:02d}"
+    nums = [int(d[4:]) for d in os.listdir(TASKS_DIR)
+            if d.startswith("task") and d[4:].isdigit()]
+    tid = f"task{(max(nums) + 1 if nums else 1):02d}"
     tdir = os.path.join(TASKS_DIR, tid)
     os.makedirs(tdir, exist_ok=True)
     prompt_path = os.path.join(tdir, "prompt.txt")
@@ -56,26 +125,28 @@ def submit_task(restatement):
     logf = open(log_path, "w")
     harness = os.environ.get("ME3_HARNESS", "pi")
     if harness == "hermes":
-        cmd = ["hermes", "chat", "--oneshot", "--query-file", prompt_path,
+        cmd = [_which("hermes"), "chat", "--oneshot", "--query-file", prompt_path,
                "--in", tdir, "--max-turns", str(MAX_TURNS),
                "--run-budget", str(RUN_BUDGET_S)]
     else:
         agent_model = os.environ.get("ME3_AGENT_MODEL", "z-ai/glm-5.3-flash")
         prompt_text = open(prompt_path).read().strip()
-        cmd = ["pi", "-p", "--provider", "openrouter", "--model", agent_model,
+        cmd = [_which("pi"), "-p", "--provider", "openrouter", "--model", agent_model,
                "--no-session", "--", prompt_text]
-    if os.path.exists(SANDBOX_PROFILE):
-        # kernel-level confinement: file writes denied outside ~/sandbox,
-        # agent runtime dirs (~/.pi, ~/.hermes) and system temp
-        cmd = ["sandbox-exec", "-f", SANDBOX_PROFILE] + cmd
+    cmd = _sandboxed(cmd, tdir)
     env = dict(os.environ)
     if "OPENROUTER_API_KEY" not in env:
-        keyfile = os.path.expanduser("~/.hermes/.env")
-        if os.path.exists(keyfile):
+        # Mac: ~/.hermes/.env; Pi: ~/me3/.env (never copied between machines)
+        for keyfile in ("~/.hermes/.env", "~/me3/.env"):
+            keyfile = os.path.expanduser(keyfile)
+            if not os.path.exists(keyfile):
+                continue
             for line in open(keyfile):
                 if line.startswith("OPENROUTER_API_KEY="):
-                    env["OPENROUTER_API_KEY"] = line.strip().split("=", 1)[1]
+                    env["OPENROUTER_API_KEY"] = line.strip().split("=", 1)[1].strip('"')
                     break
+            if "OPENROUTER_API_KEY" in env:
+                break
     proc = subprocess.Popen(
         cmd,
         stdout=logf, stderr=subprocess.STDOUT,
@@ -146,8 +217,24 @@ def _shorten(s, n=110):
 def _thing(prompt):
     """A short, human way to refer to the task's subject, e.g. 'the Tokyo itinerary site'."""
     s = re.sub(r"^you want\s*", "", prompt.strip(), flags=re.I)
+    # "research the history of X" -> "the history of X"
+    s = re.sub(r"^(please\s+)?(research|build|make|create|write|draft|design|"
+               r"plan|find|look up|put together|prepare|summari[sz]e)\s+(me\s+)?",
+               "", s, flags=re.I)
     s = re.sub(r"^(a|an|the)\s+", "", s, flags=re.I)
-    s = re.sub(r"\b(website|site|page|game|app)\b.*$", r"\1", s, flags=re.I)
+    # "a one-page website about Manila street food" -> "the Manila street food website"
+    m = re.search(r"\b(website|site|game|app|page)\s+(?:about|on|for)\s+([^,.;]+)", s, flags=re.I)
+    if m and len(m.group(2).split()) <= 5:
+        topic = m.group(2).strip()
+        if re.match(r"(my|our)\s", topic, flags=re.I):   # "for my bakery" -> "your bakery page"
+            return f"your {topic.split(None, 1)[1]} {m.group(1).lower()}"
+        return f"the {topic} {m.group(1).lower()}"
+    # cut after the thing's noun; prefer website/site/game/app over "page"
+    # so "a one-page website that says hi" -> "the one-page website"
+    if re.search(r"\b(website|site|game|app)\b", s, flags=re.I):
+        s = re.sub(r"\b(website|site|game|app)\b.*$", r"\1", s, flags=re.I)
+    else:
+        s = re.sub(r"(?<!-)\bpage\b.*$", "page", s, flags=re.I)
     words = s.split()
     return "the " + " ".join(words[:8]) if words else "your request"
 
@@ -159,7 +246,7 @@ def announcement(tid):
         return None
     thing = _thing(f.get("prompt", ""))
     if f["status"] == "done" and f["files"]:
-        return f"Done! {thing.capitalize()} is ready — take a look."
+        return f"Done! {thing[:1].upper() + thing[1:]} is ready — take a look."
     if f["status"] == "done":
         return f"Done with that. {_shorten(f['result'], 90)}"
     return f"Hmm, {thing} didn't work out — I hit a snag. Want me to give it another go?"
@@ -179,7 +266,7 @@ def open_deliverable(tid):
     if not path:
         return None
     try:
-        subprocess.Popen(["open", path])
+        open_url(path)
         return path
     except Exception as e:
         print(f"[tasks] open failed for {path}: {e}", flush=True)

@@ -1,17 +1,19 @@
 (version 1)
-; ME3 task sandbox: Hermes may do anything EXCEPT write outside the sandbox,
-; its own runtime (~/.hermes), and system temp dirs.
+; ME3 task sandbox: the agent (pi.dev or Hermes) may do anything EXCEPT
+; write outside the sandbox, its own runtime dirs and system temp dirs.
+; sandbox-exec does NOT expand "~": tasks.py passes -D HOME=<abs home>
+; (the old "~/sandbox" rules never matched, so every write was denied).
 (allow default)
 (deny file-write*)
 (allow file-write*
-  (subpath "~/sandbox")
-  (subpath "~/.hermes")
-  (subpath "~/.pi")
+  (subpath (string-append (param "HOME") "/sandbox"))
+  (subpath (string-append (param "HOME") "/.hermes"))
+  (subpath (string-append (param "HOME") "/.pi"))
+  (subpath (string-append (param "HOME") "/Library/Caches"))
   (subpath "/private/tmp")
   (subpath "/tmp")
   (subpath "/dev")
   (regex #"^/private/var/folders")
-  (regex #"^/var/folders")
-  (subpath "~/Library/Caches"))
+  (regex #"^/var/folders"))
 (allow file-read-data (subpath "/dev"))
 (allow process-exec (subpath "/dev"))

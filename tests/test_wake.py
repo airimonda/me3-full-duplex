@@ -134,6 +134,19 @@ async def main():
             fails += 1
             print(f"FAIL follow-up {text!r}: answered {got!r}, want {want!r}")
 
+    # Watson asked a question: a 2-word answer counts (Nov 6: "halo-halo"
+    # heard as "Hello. Hello." was dropped as a fragment); later it doesn't
+    agent.answer_until = time.monotonic() + 10
+    got = await run_case(agent, "halo halo", False)
+    if got != "halo halo":
+        fails += 1
+        print(f"FAIL answer window: answered {got!r}")
+    agent.answer_until = 0.0
+    got = await run_case(agent, "halo halo", False)
+    if got is not None:
+        fails += 1
+        print(f"FAIL after answer window: answered {got!r}")
+
     ev = [json.loads(l)["event"] for l in open(d / "watson_log.jsonl")]
     for need in ("ignored_idle", "woke", "greeted"):
         if need not in ev:

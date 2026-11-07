@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watson Demo Spiel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Watson dashboard system: dark editorial, cream ink, one coral accent.
+     Layout: a single reading column; each demo step is a row of
+     say / expect / fallback so it can be followed live. */
+  --bg: #141311;
+  --panel: #1c1a17;
+  --rule: #34302a;
+  --ink: #ece7dd;
+  --muted: #a39b8d;
+  --coral: #d9825f;
+  --ok: #8fb58a;
+  --warn: #d9b45f;
+  --display: "IBM Plex Serif", Georgia, serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font: 16px/1.6 var(--body); padding: 40px 20px 80px; }
+main { max-width: 860px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 500; text-wrap: balance; margin: 0; }
+h1 { font-size: 2.1rem; line-height: 1.2; }
+h2 { font-size: 1.35rem; display: flex; align-items: baseline; gap: 12px; }
+h2 .t { font: 500 0.8rem var(--mono); color: var(--coral); white-space: nowrap; }
+p { margin: 0; max-width: 68ch; }
+.sub { color: var(--muted); margin-top: 8px; }
+section { display: grid; gap: 14px; }
+.say {
+  font-family: var(--display); font-style: italic; font-size: 1.08rem; line-height: 1.65;
+  border-left: 3px solid var(--coral); padding: 2px 0 2px 18px; max-width: 68ch;
+}
+.say p + p { margin-top: 10px; }
+.note { color: var(--muted); font-size: 0.92rem; }
+code, .cmd { font-family: var(--mono); font-size: 0.86rem; }
+.cmd {
+  display: block; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 10px 12px; overflow-x: auto; white-space: pre; color: var(--ink);
+}
+.check { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.check li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+.check li::before { content: "\2610"; color: var(--coral); }
+.steps { display: grid; gap: 12px; }
+.step {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 16px 18px; display: grid; gap: 10px;
+}
+.step-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.step-head b { font-weight: 600; }
+.pill {
+  font: 500 0.72rem var(--mono); letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor;
+}
+.pill.ok { color: var(--ok); }
+.pill.warn { color: var(--warn); }
+.grid3 { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; }
+.grid3 dt { font: 500 0.78rem var(--mono); color: var(--muted); text-transform: uppercase; padding-top: 3px; }
+.grid3 dd { margin: 0; }
+.voice { font-family: var(--mono); color: var(--coral); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.tbl { overflow-x: auto; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 500 0.78rem var(--mono); color: var(--muted); text-transform: uppercase; }
+td.n { font-family: var(--mono); white-space: nowrap; }
+footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--rule); padding-top: 16px; }
+@media (max-width: 520px) {
+  .grid3 { grid-template-columns: 1fr; }
+  h1 { font-size: 1.7rem; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Watson demo run sheet</h1>
+  <p class="sub">AI 231 · ME3 · Nov 7, 2026 · about 6 minutes. Lines in coral italics are yours to say to the class. Lines in <span class="voice">mono</span> are said to Watson.</p>
+</header>
+
+<section>
+  <h2><span class="t">T&minus;10 min</span> Before you start</h2>
+  <ul class="check">
+    <li><span>The Mac and the Pi are on the same network. Check the Mac server: <code>curl -s localhost:8300/health</code> should print 200-style JSON.</span></li>
+    <li><span>Watson is running on the Pi: <code>ssh watsonpi 'pgrep -fl pipecat_assistant'</code> shows one process. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_live.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>The task server is running on the Pi: <code>ssh watsonpi 'pgrep -fl tasks_mcp'</code>. If not: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_tasks_mcp.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>The Watson UI runs on the Pi: open <code>http://192.168.1.80:8301</code> on the Mac (use the Pi's current IP). If it doesn't load: <code>ssh watsonpi 'setsid nohup bash ~/me3/run_ui.sh &gt;/dev/null 2&gt;&amp;1 &lt;/dev/null &amp;'</code></span></li>
+    <li><span>On the Mac, start the viewer that opens Watson's results: <code>cd ~/me3 &amp;&amp; ./venv/bin/python mac_show.py --pi http://192.168.1.80:8301</code></span></li>
+    <li><span>Wait 2 minutes after any restart. The voice model loads for about 100 s, and speech recognition is slow until it finishes.</span></li>
+    <li><span>Say <span class="voice">"Watson"</span> once. You should hear "Yes? I'm listening." in the Deepgram Jupiter voice.</span></li>
+    <li><span>If Watson ignores you (log shows <code>stranger_ignored</code>), someone else holds the session: say <span class="voice">"Watson, it's me again"</span> to take it back. Only if that fails, restore your saved profile and restart Watson:</span></li>
+  </ul>
+  <code class="cmd">ssh watsonpi 'cp ~/me3/voice_profile_nov6_good.npy ~/me3/voice_profile.npy; pkill -f "[p]ipecat_assistant.py --mic"'</code>
+  <p class="note">Speak close to the USB mic. Watson answers only whoever holds the session; anyone takes it by saying "Watson". Say "Watson" yourself before you start.</p>
+</section>
+
+<section>
+  <h2><span class="t">0:00 · 30 s</span> Opening</h2>
+  <div class="say">
+    <p>Most voice assistants are walkie-talkies: you talk, they talk, and nobody interrupts. Watson is full duplex. It listens while it speaks, so you can cut it off, talk over it, or say "yeah" without derailing it.</p>
+    <p>It also has to decide who it is listening to. Its own voice comes back through the microphone, and so does everyone else in this room. I'll show you how it handles both.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="t">0:30 · 60 s</span> How it works</h2>
+  <div class="say">
+    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. Speech recognition and Watson's voice come from Deepgram, called straight from the Pi, and a fast language model, GLM 5.3 Flash, writes the replies and calls the tools. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the finished page opens on my Mac the moment it's done.</p>
+    <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. The recognizer used to hear "Watson" as "button" or "Hudson". Part of that was us: the first syllable was being cut off before it reached the recognizer. Now we keep the audio from just before you start speaking, and Deepgram is primed with the word "Watson".</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="t">1:30 · 3 min</span> Live demo</h2>
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-head"><b>1. Wake word</b><span class="pill ok">verified live Nov 6</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson"</span></dd>
+        <dt>Expect</dt><dd>"Yes? I'm listening." about 2 s later.</dd>
+        <dt>Tell class</dt><dd>It still accepts the old mishearings ("button", "Hudson") as a safety net for my accent.</dd>
+        <dt>If it fails</dt><dd>Say it again, closer to the mic. "Watson, Watson" counts as one wake.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>2. Start a big task</b><span class="pill ok">verified on the Pi Nov 6 (MCP)</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson, build me a one-page website about Manila street food."</span></dd>
+        <dt>Expect</dt><dd>"On it. I'll let you know when it's done." The job goes to our task MCP server on the Pi, which runs the pi.dev agent in a sandbox folder.</dd>
+        <dt>Tell class</dt><dd>The agent can only write inside its sandbox folder. Watson stays free while it works.</dd>
+        <dt>If it fails</dt><dd>If Watson asks what the site is about, answer in one sentence. If it says it can't reach the agent, run the restart line from the checklist.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>2b. A fact it must not make up, while the task runs</b><span class="pill ok">web search, spoken answer</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson, who won the 2026 NBA finals?"</span></dd>
+        <dt>Expect</dt><dd>Watson searches the web and says the answer. Nothing opens on screen.</dd>
+        <dt>Tell class</dt><dd>When the model doesn't know, it looks it up instead of guessing. The big task is still running.</dd>
+        <dt>If it fails</dt><dd>Wait 7 s before repeating. Replies can take 4 to 7 s to start.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>3. Smart home, while the task runs</b><span class="pill ok">verified live Nov 6</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson, turn the living room lights off."</span></dd>
+        <dt>Expect</dt><dd>"Done, lights are off." The state changes in the virtual home and on the dashboard.</dd>
+        <dt>Tell class</dt><dd>Even "Watson ... lights off" with a pause works. The sentence right after the wake word counts as addressed.</dd>
+        <dt>If it fails</dt><dd>Repeat as one breath: <span class="voice">"Watson, lights off."</span></dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>3b. The big task finishes</b><span class="pill ok">verified on the Pi Nov 6</span></div>
+      <dl class="grid3">
+        <dt>Expect</dt><dd>At the next quiet moment: "Done! The Manila street food website is ready — take a look." The page opens on the Mac by itself.</dd>
+        <dt>Tell class</dt><dd>It waits until nobody is talking, and it never reads out a file path.</dd>
+        <dt>If it fails</dt><dd>Keep talking; the announcement stays queued and plays at the next pause.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>4. Interrupt it</b><span class="pill warn">works, slow: stops in 1.5 to 2.2 s</span></div>
+      <dl class="grid3">
+        <dt>Say</dt><dd><span class="voice">"Watson, tell me about the history of the Eiffel Tower."</span> Wait until it is a sentence in, then say <span class="voice">"Stop."</span></dd>
+        <dt>Expect</dt><dd>It goes quiet and waits.</dd>
+        <dt>Tell class</dt><dd>It did not stop for its own voice, which reaches the mic at the same level as mine. It stopped for my voice saying a stop word: "stop", "wait" or "Watson".</dd>
+        <dt>If it fails</dt><dd>Say <span class="voice">"Stop"</span> once more, louder. Don't repeat it rapidly.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>5. A classmate takes over</b><span class="pill ok">tested in code; try it live once before class</span></div>
+      <dl class="grid3">
+        <dt>Do</dt><dd>Ask a classmate to say something without the wake word, then <span class="voice">"Watson, what time is it?"</span> Then you speak again without "Watson".</dd>
+        <dt>Expect</dt><dd>The first sentence is ignored. After "Watson", Watson answers the classmate, and now ignores you. Say <span class="voice">"Watson"</span> to take it back.</dd>
+        <dt>Tell class</dt><dd>Watson listens to one person at a time: whoever called it last. The TV or side talk can't take over, and Watson's own voice saying its name can't either.</dd>
+        <dt>If it fails</dt><dd>The classmate's "Watson, …" needs about a second of speech so Watson can learn the voice. Ask them to say a full sentence.</dd>
+      </dl>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><b>6. Idle (tell, don't wait)</b><span class="pill ok">verified live Nov 6</span></div>
+      <dl class="grid3">
+        <dt>Tell class</dt><dd>After 5 minutes with no activity, Watson goes idle and answers only speech that starts with its name. That stops it from joining in when we talk among ourselves.</dd>
+      </dl>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <h2><span class="t">4:30 · 45 s</span> Numbers</h2>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Measure</th><th>Result</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">2.6 s median</td><td>fdbench on the Pi, Nov 7 (target 4.0 s; Nov 6 was 4.9 s)</td></tr>
+      <tr><td>Speech recognition (Deepgram, streamed)</td><td class="n">0.24 s</td><td>fdbench on the Pi, median (target 0.8 s; was 0.93 s)</td></tr>
+      <tr><td>Language model's first word</td><td class="n">1.99 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
+      <tr><td>Voice (Deepgram, streamed) to first audio</td><td class="n">0.29 s</td><td>fdbench on the Pi, median (target 0.6 s; was 1.60 s)</td></tr>
+      <tr><td>Word error rate</td><td class="n">0.12</td><td>fdbench, 30 timed phrases (target 0.15)</td></tr>
+      <tr><td>Stops talking when interrupted</td><td class="n">0.75 / 0.76 s</td><td>Full-Duplex-Bench stop time, 2 trials; judge 5.0 / 5</td></tr>
+      <tr><td>Answered speech not meant for it</td><td class="n">0 / 4</td><td>Full-Duplex-Bench, Nov 7 (side talk, TV, noise, background)</td></tr>
+      <tr><td>Pi under load</td><td class="n">peak 73 °C</td><td>never throttled, no fan</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="say">
+    <p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds. Even the slow turns now start within four seconds.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="t">5:15 · 30 s</span> What's left</h2>
+  <div class="say">
+    <p>Three honest limits. The language model still takes about two seconds to start, and sometimes three. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="t">5:45 · 15 s</span> Close</h2>
+  <div class="say">
+    <p>Watson listens while it talks, knows who it is listening to, and understands its name in my accent. Thank you. Happy to take questions, or you can try to make it talk to you.</p>
+  </div>
+</section>
+
+<footer>
+  Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_10-10-53); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 1 of 2 on the Nov 7 bench, and not tried live with the room speaker.
+</footer>
+
+</main>
+</body>
+</html>

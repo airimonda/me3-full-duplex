@@ -29,6 +29,12 @@ import wave
 from pathlib import Path
 
 import httpx
+import mcp_client   # Pi -> Mac task MCP server (ME3_TASKS_MCP)
+try:  # fd-benchmark stage marks (no-op unless fdbench is running)
+    from fdbench_marks import mark
+except Exception:  # pragma: no cover
+    def mark(*_a, **_k):
+        pass
 import numpy as np
 from pipecat.processors.frame_processor import FrameProcessor
 
@@ -42,8 +48,32 @@ TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_michael")
 FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
-ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3
-ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3
+ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3 | deepgram
+ME3_TTS = os.environ.get("ME3_TTS", "local")   # local | dgx3 | deepgram
+# Deepgram (owner's choice, Nov 6): cloud ASR + TTS straight from the Pi, so
+# the voice path no longer needs the Mac. Key: DEEPGRAM_API_KEY in the env,
+# ~/.hermes/.env (Mac) or ~/me3/.env (Pi); never logged.
+DG_URL = "https://api.deepgram.com/v1"
+DG_ASR_MODEL = os.environ.get("ME3_DG_ASR_MODEL", "nova-3")
+# Aura-2 voice; keep it far from the owner's voice (echo rejection by identity)
+DG_VOICE = os.environ.get("ME3_DG_VOICE", "aura-2-jupiter-en")   # owner pick; sim 0.422 to owner
+# Streaming TTS (Nov 7): play Deepgram PCM as it arrives and synthesize the
+# next sentence while the current one plays. ME3_TTS_STREAM=0 restores the
+# old whole-WAV-per-sentence path (kept for A/B benchmarks).
+TTS_STREAM = os.environ.get("ME3_TTS_STREAM", "1") != "0"
+# Streaming ASR (Nov 7): with ME3_ASR=deepgram, open a Deepgram live
+# websocket at speech onset and feed audio while the user talks, so the
+# transcript is ready right after the endpoint (REST is the fallback).
+ASR_STREAM = os.environ.get("ME3_ASR_STREAM", "1") != "0"
+# Tool turns (Nov 7): say a short cached phrase while tools and the
+# second LLM pass run, instead of 2-4 s of silence.
+TOOL_ACK = os.environ.get("ME3_TOOL_ACK", "1") != "0"
+TOOL_ACK_PHRASES = ("One sec.", "Sure, one moment.", "Okay, one sec.")
+# LLM routing (Nov 7): OpenRouter serves the talker from 40+ providers;
+# sort by latency, and go to the fallback model after ONE empty stream.
+LLM_FAST = os.environ.get("ME3_LLM_FAST", "1") != "0"
+# nova-3 keyterm prompting: bias recognition toward the wake word
+DG_KEYTERMS = [k for k in os.environ.get("ME3_DG_KEYTERMS", "Watson").split(",") if k]
 DGX3 = os.environ.get("DGX3_HOST", "")         # e.g. http://10.x.x.x; empty = local backends only
 DGX3_ASR_MODEL = "Qwen/Qwen2-Audio-7B-Instruct"
 DGX3_TTS_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
@@ -212,6 +242,15 @@ def _wake_split_once(text: str) -> tuple[bool, str]:
 
 
 _REFRESH_W = float(os.environ.get("ME3_VOICE_REFRESH_W", "0.1"))
+# session claim by wake word: need this much voiced audio to know who it is
+_CLAIM_MIN_VOICED_S = float(os.environ.get("ME3_CLAIM_MIN_VOICED_S", "0.8"))
+# a "Watson" this close to Watson's own TTS voice is our echo, not a person
+_OWN_VOICE_SIM = float(os.environ.get("ME3_OWN_VOICE_SIM", "0.75"))
+
+
+def _cos(a, b) -> float:
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9))
+_MCP_POLL_S = 3.0   # how often the Pi asks the task MCP server for finished jobs
 
 
 def blend_profile(old, new, w: float = _REFRESH_W):
@@ -307,6 +346,9 @@ def _to_in_sr(samples: np.ndarray, sr: int) -> np.ndarray:
                      np.arange(len(samples)), samples).astype(np.int16)
 _ENDPOINT_MS = 600
 _MIN_UTT_MS = 250
+_PREROLL_MS = int(os.environ.get("ME3_PREROLL_MS", "400"))   # audio kept before VAD onset
+_PREROLL_BYTES = _IN_SR * 2 * _PREROLL_MS // 1000
+_ANSWER_WINDOW_S = 10.0   # after Watson asks a question, short replies count
 _BARGE_MS = 150
 _SPEAK_THRESH = 0.5
 
@@ -321,6 +363,38 @@ def _openrouter_key() -> str | None:
             if line.startswith("OPENROUTER_API_KEY="):
                 return line.split("=", 1)[1].strip().strip('"')
     return None
+
+
+def _env_key(name: str) -> str | None:
+    v = os.environ.get(name)
+    if v:
+        return v.strip()
+    for path in (Path.home() / ".hermes" / ".env", Path.home() / "me3" / ".env"):
+        if path.exists():
+            for line in path.read_text().splitlines():
+                if line.startswith(name + "="):
+                    return line.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def _dg_speak_request(text: str, raw: bool = False):
+    """(url, headers, json) for Deepgram Aura TTS -> 24 kHz mono WAV, or
+    headerless 16-bit PCM when raw=True (streamed as it is generated)."""
+    url = (f"{DG_URL}/speak?model={DG_VOICE}&encoding=linear16"
+           f"&sample_rate={_OUT_SR}&container={'none' if raw else 'wav'}")
+    return url, {"Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}"}, {"text": text}
+
+
+def _tts_sync(text: str, voice: str | None = None) -> bytes:
+    """Blocking TTS for start-up work (Watson's own voice embedding)."""
+    if ME3_TTS == "deepgram":
+        url, hdr, body = _dg_speak_request(text)
+        r = httpx.post(url, headers=hdr, json=body, timeout=60)
+    else:
+        r = httpx.post(SERVER + "/speak", timeout=60,
+                       json={"voice": voice or TTS_VOICE, "text": text})
+    r.raise_for_status()
+    return r.content
 
 
 def _wav_bytes(pcm16: bytes, sr: int) -> bytes:
@@ -365,6 +439,7 @@ class WatsonAgent(FrameProcessor):
             confidence=0.5, start_secs=0.1, stop_secs=0.6, min_volume=0.004))
         self.vad.set_sample_rate(_IN_SR)
         self.buf = bytearray()
+        self.preroll = bytearray()      # last _PREROLL_MS of quiet audio (onset pre-roll)
         self.in_speech = False
         self.silence_ms = 0.0
         self.speech_ms = 0.0
@@ -372,6 +447,10 @@ class WatsonAgent(FrameProcessor):
         self.barge_ms = 0.0
         self.play_task = None
         self.respond_task = None   # in-flight _respond coroutine (for supersede)
+        self.asr_live = None       # _DGLive session of the utterance in progress
+        self.asr_spare = None      # pre-connected _DGLive for the next onset
+        self.ack_pcm = {}          # tool-ack phrase -> PCM (filled on first use)
+        self.ack_i = 0
         self.key = _openrouter_key()
         self.dgx_key = _dgx3_key()
         self._bad_logged = 0
@@ -398,11 +477,16 @@ class WatsonAgent(FrameProcessor):
         self.spoken_tokens = set()      # words of the reply being spoken (echo filter)
         self.last_task_check = 0.0
         self.announce_task = None
+        self.last_mcp_poll = 0.0
+        self.pending_announce = []      # finished-task lines not yet spoken
         # idle state (mic mode): last accepted turn / playback / wake word
         self.last_active = time.monotonic()
         self.wake_follow_until = 0.0    # bare wake: next utterance is addressed
+        self.answer_until = 0.0         # Watson asked a question: short answers count
         # speaker enrollment: same profile file as the live loop (chat.py)
-        sys.path.insert(0, str(Path.home() / "me3"))
+        # this file's own folder (~/me3 on the Pi), not a hard-coded ~/me3:
+        # a checkout elsewhere must import its own brain.py / tasks.py
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
         import speakerid
         import brain as chatbrain     # SYSTEM_PROMPT + QUICK_TOOLS + execute_tool
         import tasks as taskmgr       # sandboxed Hermes delegation
@@ -438,13 +522,13 @@ class WatsonAgent(FrameProcessor):
         if self.mode != "mic":
             return
         try:
-            r = httpx.post(SERVER + "/speak", timeout=60, json={"voice": TTS_VOICE,
-                "text": "The Eiffel Tower was built in Paris for the World Fair. "
-                        "Sure, I can help with that, it is three in the afternoon."})
-            a = np.frombuffer(_wav_pcm(r.content), dtype=np.int16)
+            wav = _tts_sync("The Eiffel Tower was built in Paris for the World Fair. "
+                            "Sure, I can help with that, it is three in the afternoon.")
+            a = np.frombuffer(_wav_pcm(wav), dtype=np.int16)
             a = _resample(a, _OUT_SR, _IN_SR) / 32768.0
             self.watson_emb = self.spk.embed((a / (np.abs(a).max() + 1e-9)).astype(np.float32))
-            self.log_event("watson_voice_ready", voice=TTS_VOICE,
+            self.log_event("watson_voice_ready",
+                           voice=DG_VOICE if ME3_TTS == "deepgram" else TTS_VOICE,
                            sim_owner=(round(float(np.dot(self.watson_emb, self.speaker)), 3)
                                       if self.speaker is not None else None))
         except Exception as e:
@@ -459,8 +543,11 @@ class WatsonAgent(FrameProcessor):
             return
         self.log_event("prompt_after_stop")
         try:
-            r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
-            wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
+            if ME3_TTS == "deepgram":
+                wav = await self._speak("Go ahead.")
+            else:
+                r = await self.http.get(f"{SERVER}/speak_cache/go_ahead")
+                wav = r.content if r.status_code == 200 else await self._speak("Go ahead.")
         except Exception:
             wav = await self._speak("Go ahead.")
         if wav and self.gen == gen and not self.in_speech:
@@ -492,6 +579,7 @@ class WatsonAgent(FrameProcessor):
         return sw > so, round(sw, 3), round(so, 3)
 
     async def _commit_barge(self):
+        mark("interrupted")
         from pipecat.frames.frames import InterruptionFrame
         from pipecat.processors.frame_processor import FrameDirection
         # sustained speech that is NOT echo: commit the interruption
@@ -501,6 +589,17 @@ class WatsonAgent(FrameProcessor):
         # keep it, or a short backchannel ("uh-huh yeah", <1 s) reaches ASR
         # as only its silent tail (ignored_quiet peak 0.0) and resume never fires
         self.buf = self.probe_pcm
+        # live ASR gets _PREROLL_MS of mic audio from before the probe too
+        # (play_mic holds the mic during playback): the probe starts ~0.1-0.3 s
+        # into the onset, and streaming lost first words that REST recovered
+        # ("When is the next full moon?" -> "Is the next...", bench 08-59-00)
+        # Bench only: in mic mode the audio before the probe is Watson's own
+        # echo (the keyword path discards even the probe for that reason).
+        want = len(self.probe_pcm) + _PREROLL_BYTES
+        if self.mode == "bench" and self.probe_pcm and len(self.play_mic) >= len(self.probe_pcm):
+            self._live_open(bytes(self.play_mic[-want:]))
+        else:
+            self._live_open(bytes(self.probe_pcm))
         self.speech_ms = self.probe_ms
         self.probe_pcm = bytearray()
         self.gen += 1
@@ -528,6 +627,9 @@ class WatsonAgent(FrameProcessor):
         from pipecat.frames.frames import InterruptionFrame
         from pipecat.processors.frame_processor import FrameDirection
         pcm = samples.tobytes()
+        if (self.asr_spare is None and self.asr_live is None
+                and ASR_STREAM and ME3_ASR == "deepgram"):
+            self.asr_spare = _DGLive(self)   # first spare (later ones: _live_open)
         state = await self.vad.analyze_audio(pcm)
         ms = len(samples) / _IN_SR * 1000
         rms = float(np.sqrt(np.mean((samples.astype(np.float32) / 32768.0) ** 2)) + 1e-9)
@@ -647,7 +749,15 @@ class WatsonAgent(FrameProcessor):
         if self.play_mic:
             self.play_mic = bytearray()
         if state != VADState.QUIET:
+            if not self.in_speech:
+                # pre-roll: the VAD fires ~100-300 ms into a soft onset, so
+                # the "Wat" of "Watson" was cut off (Deepgram heard "Watson
+                # lights off" as "Sunlight's off", Nov 6)
+                self._live_open(bytes(self.preroll))
+                self.buf.extend(self.preroll)
+                self.preroll = bytearray()
             self.buf.extend(pcm)
+            self._live_feed(pcm)
             self.in_speech = True
             self.speech_ms += ms
             self.silence_ms = 0.0
@@ -659,12 +769,21 @@ class WatsonAgent(FrameProcessor):
             self.silence_ms = 0.0
             speech = self.speech_ms
             self.speech_ms = 0.0
+            live, self.asr_live = self.asr_live, None
             if speech >= _MIN_UTT_MS and len(utt) > _IN_SR * 2 * _MIN_UTT_MS / 1000:
-                asyncio.create_task(self._respond(utt))
+                if live is not None:
+                    live.finish()
+                asyncio.create_task(self._respond(utt, live))
+            elif live is not None:
+                live.cancel()
             self.dbg_max = 0.0
         else:
             # idle: keep learning the ambient noise floor
             self.ambient_rms = 0.9 * self.ambient_rms + 0.1 * rms
+            # keep the last _PREROLL_MS of quiet audio for the next onset
+            self.preroll.extend(pcm)
+            if len(self.preroll) > _PREROLL_BYTES:
+                del self.preroll[:len(self.preroll) - _PREROLL_BYTES]
             # finished background tasks: announce once per second check,
             # only while nobody is talking and no reply is in flight
             now = time.monotonic()
@@ -675,25 +794,44 @@ class WatsonAgent(FrameProcessor):
                 self.announce_task = asyncio.create_task(self._announce_finished())
 
     async def _announce_finished(self):
-        """Speak the line for each newly finished background task (ported
-        from legacy/chat.py's idle loop) and open its deliverable."""
+        """Announce finished background tasks, one at a time, only while
+        nobody is talking. With ME3_TASKS_MCP set (Pi), jobs run on the Mac
+        task MCP server, which already opened the deliverable; otherwise
+        tasks.py runs locally and we open it here. A line that gets cut off
+        (the user starts talking) stays queued and is retried."""
+        now = time.monotonic()
         try:
-            done = self.taskmgr.check_finished()
+            if mcp_client.enabled():
+                if now - self.last_mcp_poll >= _MCP_POLL_S:
+                    self.last_mcp_poll = now
+                    raw = await asyncio.to_thread(mcp_client.call, "finished", 5.0)
+                    for a in json.loads(raw or "[]"):
+                        self.pending_announce.append(
+                            {"id": a.get("id"), "line": a.get("line", ""), "opened": a.get("opened")})
+            else:
+                for tid in self.taskmgr.check_finished():
+                    opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
+                    self.pending_announce.append(
+                        {"id": tid, "line": self.taskmgr.announcement(tid) or "", "opened": bool(opened)})
         except Exception as e:
             self.log_event("announce_error", err=repr(e)[:120])
+        if not self.pending_announce:
             return
-        for tid in done:
-            line = self.taskmgr.announcement(tid)
-            if not line:
-                continue
-            gen = self.gen
-            wav = await self._speak(line)
-            if wav and self.gen == gen and not self.in_speech:
-                self.playing = True
-                await self._play_pcm(_wav_pcm(wav), gen)
-                self.playing = False
-            opened = await asyncio.to_thread(self.taskmgr.open_deliverable, tid)
-            self.log_event("announce", id=tid, line=line, opened=opened)
+        item = self.pending_announce[0]
+        line = self.chatbrain.speakable(item["line"])
+        if not line:
+            self.pending_announce.pop(0)
+            return
+        gen = self.gen
+        wav = await self._speak(line)
+        if not wav or self.gen != gen or self.in_speech:
+            return   # busy: keep it queued, retry on the next idle tick
+        self.playing = True
+        await self._play_pcm(_wav_pcm(wav), gen)
+        self.playing = False
+        if self.gen == gen:
+            self.pending_announce.pop(0)
+            self.log_event("announce", id=item["id"], line=line, opened=item["opened"])
 
     # ---- brain -----------------------------------------------------------
     def _set_timer_local(self, secs: int, label: str) -> str:
@@ -715,7 +853,26 @@ class WatsonAgent(FrameProcessor):
         return f"Timer set for {nice} — {label}."
 
     async def _delegate(self, rest: str, gen: int, user_text: str = "") -> str:
-        """Submit the task to the sandboxed Hermes agent; speak a natural ack."""
+        """Submit the task to the sandboxed agent; speak a natural ack.
+        Pi: over MCP to the Mac task server (the agent runs there, in
+        ~/sandbox). Mac without ME3_TASKS_MCP: tasks.py locally."""
+        if mcp_client.enabled():
+            try:
+                raw = await asyncio.to_thread(mcp_client.call, "submit_task", 15.0,
+                                              request=rest)
+                res = json.loads(raw)
+                tid, ack = res.get("id"), res.get("ack") or "On it."
+            except Exception as e:
+                tid, ack = None, "Sorry, I couldn't reach my agent just now."
+                self.log_event("delegate_failed", err=repr(e)[:120], task=rest[:80])
+            self.log_event("delegated", user=user_text, task=rest[:80],
+                           tid=str(tid)[:40], via="mcp")
+            wav = await self._speak(ack)
+            if wav and self.gen == gen:
+                self.playing = True
+                await self._play_pcm(_wav_pcm(wav), gen)
+                self.playing = False
+            return ack
         try:
             running = len(self.taskmgr.list_running())
         except Exception:
@@ -747,15 +904,23 @@ class WatsonAgent(FrameProcessor):
             self.playing = False
         return ack
 
-    async def _respond(self, utt_pcm: bytes):
+    async def _respond(self, utt_pcm: bytes, live=None):
+        mark("vad_end")   # endpoint just committed this utterance
         t0 = time.perf_counter()
         gen = self.gen
+        if TOOL_ACK and not self.ack_pcm and ME3_TTS == "deepgram":
+            self.ack_pcm[None] = b""   # warming marker: fill once, in the background
+            asyncio.create_task(self._warm_acks())
+        if ME3_TTS == "deepgram" and TTS_STREAM:
+            asyncio.create_task(self._dg_warm())
         # volume gate: TV/radio clips sit far below live speech level
         peak = float(np.max(np.abs(np.frombuffer(utt_pcm, dtype=np.int16)))) / 32768.0
         # bench only: in mic mode the voice-ID gate rejects TV/strangers, and
         # this fixed level dropped the owner at normal USB-mic gain (Nov 5)
         if self.mode == "bench" and peak < 0.10:
             self.log_event("ignored_quiet", peak=round(peak, 3))
+            if live is not None:
+                live.cancel()
             return
         # faint-speech gate (bench only; mic mode has the voice-ID gate):
         # background speech peaks above the 0.10 gate but its typical voiced
@@ -763,9 +928,12 @@ class WatsonAgent(FrameProcessor):
         lvl_db = _voiced_db(utt_pcm)
         if self.mode == "bench" and lvl_db < _MIN_VOICED_DB:
             self.log_event("ignored_faint", lvl_db=round(lvl_db, 1))
+            if live is not None:
+                live.cancel()
             return
         from pipecat.frames.frames import OutputAudioRawFrame
-        text = await self._asr(utt_pcm)
+        text = await self._asr_utterance(utt_pcm, live)
+        mark("asr_final", text=text or "")
         t_asr = time.perf_counter()
         if not text or len(text.strip()) < 2:
             return
@@ -854,40 +1022,55 @@ class WatsonAgent(FrameProcessor):
             # wake-prefixed: count the whole utterance ("Watson, lights off"
             # is addressed and long enough to embed, not a fragment)
             words = (heard if is_wake else text).split()
-            fragment = not followup and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
+            # a short answer to Watson's own question ("halo-halo") is not a fragment
+            answering = time.monotonic() < self.answer_until
+            fragment = not followup and not answering and (len(words) <= 2 or not all(ord(c) < 0x2E80 for c in text))
             if fragment:
                 self.log_event("fragment_skipped_gate", user=text)
                 # mic mode: a fragment ("we", "okay") must not spawn a response —
                 # it would supersede the in-flight reply and kill it
                 return
-            elif self.speaker is not None:
-                sim = self.spk.similarity(norm, self.speaker)
-                if sim < 0.0:
-                    # embed failed (too quiet/short): fail OPEN, never lock out
-                    self.log_event("voice_gate_unavailable", user=text)
-                elif sim < self.spk.near_threshold():
-                    self.log_event("stranger_ignored", user=text, sim=round(sim, 3))
-                    return
-                elif sim < self.spk.threshold():
-                    # near-miss: accept, but only refresh the profile from
-                    # wake-prefixed commands (definitely the owner speaking)
-                    if no_gate:
-                        emb = self.spk.embed(norm)
-                        if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                            # blend, never replace: on Nov 6 one short "Watson
-                            # lights off" overwrote the profile and the owner
-                            # then scored 0.52-0.58 (locked out)
-                            self.speaker = blend_profile(self.speaker, emb)
-                            self.spk.save_profile(self.speaker)
-                            self.log_event("voice_refreshed", sim=round(sim, 3))
-            elif (is_wake and len(utt_pcm) > _IN_SR * 2):
-                # no profile yet: enroll ONLY a wake-prefixed speaker, so a
-                # stranger (or the TV) can never claim the profile by talking
-                emb = self.spk.embed(norm)
-                if emb is not None and self.spk.voiced_seconds(norm) >= 2.0:
-                    self.spk.save_profile(emb)
-                    self.speaker = emb
-                    self.log_event("enrolled")
+            else:
+                # Session ownership (owner's rule, Nov 6): only the person who
+                # holds the session is answered, and ANYONE takes the session
+                # by calling Watson; the previous person is then ignored
+                # until they call Watson again.
+                # One embedding, off the event loop: on the Pi 4 resemblyzer
+                # takes seconds (inline + a second refresh embed stalled ASR
+                # and barge-in: 12.6 s from transcript to LLM call, Nov 6).
+                emb = await asyncio.to_thread(self.spk.embed, norm)
+                voiced = self.spk.voiced_seconds(norm) if emb is not None else 0.0
+                sim = (_cos(emb, self.speaker)
+                       if emb is not None and self.speaker is not None else -1.0)
+                if is_wake:
+                    if emb is None or voiced < _CLAIM_MIN_VOICED_S:
+                        # too short to know who it is: answer, keep the session
+                        self.log_event("voice_gate_unavailable", user=text)
+                    elif (self.watson_emb is not None
+                          and _cos(emb, self.watson_emb) > _OWN_VOICE_SIM):
+                        # our own reply saying "Watson" through the room
+                        self.log_event("echo_claim_ignored", user=text,
+                                       sim_watson=round(_cos(emb, self.watson_emb), 3))
+                        return
+                    elif self.speaker is None or sim < self.spk.near_threshold():
+                        had_owner = self.speaker is not None
+                        self.speaker = emb
+                        self.spk.save_profile(emb)
+                        self.log_event("session_claimed" if had_owner else "enrolled",
+                                       user=text, sim_prev=round(sim, 3))
+                    elif sim < self.spk.threshold() and voiced >= 2.0:
+                        # the same person, drifting: blend, never replace
+                        # (one short utterance once locked the owner out)
+                        self.speaker = blend_profile(self.speaker, emb)
+                        self.spk.save_profile(self.speaker)
+                        self.log_event("voice_refreshed", sim=round(sim, 3))
+                elif self.speaker is not None:
+                    if sim < 0.0:
+                        # embed failed (too quiet/short): fail OPEN
+                        self.log_event("voice_gate_unavailable", user=text)
+                    elif sim < self.spk.near_threshold():
+                        self.log_event("stranger_ignored", user=text, sim=round(sim, 3))
+                        return
         # bench mode: no voice gate — benchmark clips are not enrolled speakers
         self.last_active = time.monotonic()   # accepted turn: stay awake
         # a NEW accepted utterance supersedes an in-flight reply (fragments and
@@ -901,6 +1084,11 @@ class WatsonAgent(FrameProcessor):
             await self.push_frame(InterruptionFrame(), direction=FrameDirection.DOWNSTREAM)
             self.log_event("superseded")
         self.respond_task = asyncio.current_task()
+        # take the generation AFTER superseding: the gen read at the top of
+        # _respond is stale once we bumped it, and our own stream would then
+        # quit on its first line (Nov 6 Pi: both "build me a website" turns
+        # ended silent 1 ms after llm_http)
+        gen = self.gen
         # --- direct handoff: "have the agent do X" skips the LLM entirely ---
         m = re.search(r"have the agent\s+(?:do\s+|build\s+|make\s+|create\s+|write\s+|fix\s+|research\s+|find\s+|set\s+up\s+)?(.+)", text, re.I)
         if not m:
@@ -920,7 +1108,9 @@ class WatsonAgent(FrameProcessor):
                                total_s=round(time.perf_counter() - t0, 3))
                 return
         self.spoken_tokens = set()   # new reply: only its own words are echo
-        self.history.append({"role": "user", "content": text})
+        user_msg = {"role": "user", "content": text}
+        self.history.append(user_msg)
+        ft_marked = [False]   # one llm_first_token mark per turn
         # cap context: talker first-token grows with history (glm-5.3-flash:
         # 1.1-2.0 s at 2 msgs vs 2.0-3.7 s at 54; bench spikes hit 7-10 s and
         # missed the 8 s turn window). Keep system + the last _HIST_KEEP
@@ -939,7 +1129,26 @@ class WatsonAgent(FrameProcessor):
         max_words = 35 if self.mode == "bench" else 400
         first_token = None
 
-        async def one_pass(msgs, use_tools, model=TALKER_MODEL):
+        async def one_pass(msgs, use_tools, model=TALKER_MODEL, after=None):
+            """One streaming LLM pass. With TTS_STREAM, sentences go to a
+            _SpeechOut that synthesizes and plays them while the LLM keeps
+            streaming; the pass returns once everything said has played."""
+            nonlocal first_audio
+            out = _SpeechOut(self, gen, after=after) if TTS_STREAM else None
+            if out is None and after is not None:
+                await after   # old path: let the ack finish before speaking
+            streams = []
+            try:
+                return await one_pass_body(msgs, use_tools, model, out, streams)
+            finally:
+                for st in streams:
+                    await st.aclose()
+                if out is not None:
+                    await out.finish()
+                    if first_audio is None and out.first_audio is not None:
+                        first_audio = out.first_audio
+
+        async def one_pass_body(msgs, use_tools, model, out, streams):
             """One streaming LLM pass. Accumulates tool calls; emits TTS
             sentence-by-sentence; returns the tool calls (if any)."""
             nonlocal first_token, first_audio, reply, delegate_rest
@@ -952,9 +1161,22 @@ class WatsonAgent(FrameProcessor):
                     "temperature": _TALKER_TEMP}
             if use_tools:
                 body["tools"] = self.tools
-            stream = await self.http.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self.key}"}, json=body)
+            if LLM_FAST:
+                body["provider"] = {"sort": "latency"}
+            # exact prompt tokens for fdbench's context-size section: OpenRouter
+            # puts usage in the last stream chunk -> llm_usage mark below
+            body["usage"] = {"include": True}
+            chars = sum(len(json.dumps(m.get("content") or "")) for m in msgs) + \
+                (len(json.dumps(body["tools"])) if use_tools else 0)
+            mark("llm_request", messages=len(msgs), chars=chars, est_tokens=chars // 4)
+            # send(stream=True): read SSE lines as they arrive. A plain post()
+            # downloaded the WHOLE reply first, so "first token" was really the
+            # complete reply (Nov 7 finding); the 20 s read timeout still
+            # applies per read.
+            stream = await self.http.send(self.http.build_request(
+                "POST", "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.key}"}, json=body), stream=True)
+            streams.append(stream)
             self.log_event("llm_http", status=stream.status_code,
                            model=model, n_msgs=len(msgs),
                            n_tools=len(body.get("tools", [])))
@@ -967,12 +1189,24 @@ class WatsonAgent(FrameProcessor):
                 if data == "[DONE]":
                     break
                 try:
-                    d = json.loads(data)["choices"][0]["delta"]
+                    obj = json.loads(data)
+                    u = obj.get("usage")
+                    if u and u.get("prompt_tokens"):
+                        mark("llm_usage", prompt_tokens=u["prompt_tokens"],
+                             completion_tokens=u.get("completion_tokens"))
+                        self.log_event("llm_usage", prompt_tokens=u["prompt_tokens"],
+                                       completion_tokens=u.get("completion_tokens"))
+                    if not obj.get("choices"):
+                        continue   # usage-only chunk
+                    d = obj["choices"][0]["delta"]
                 except Exception:
                     if "error" in data or self._bad_logged < 3:
                         self.log_event("llm_bad_line", line=data[:200])
                         self._bad_logged += 1
                     continue
+                if not ft_marked[0] and (d.get("tool_calls") or d.get("content")):
+                    mark("llm_first_token")
+                    ft_marked[0] = True
                 for tc in d.get("tool_calls") or []:
                     i = tc.get("index", 0)
                     slot = calls.setdefault(i, {"id": "", "name": "", "args": ""})
@@ -1010,7 +1244,9 @@ class WatsonAgent(FrameProcessor):
                 m = _emit_point(buf)
                 if m:
                     chunk_text, buf = buf[:m + 1], buf[m + 1:]
-                    if chunk_text.strip():
+                    if chunk_text.strip() and out is not None:
+                        out.say(chunk_text.strip())
+                    elif chunk_text.strip():
                         wav = await self._speak(chunk_text.strip())
                         if wav and self.gen == gen:
                             if first_audio is None:
@@ -1019,7 +1255,9 @@ class WatsonAgent(FrameProcessor):
                             await self._play(wav, gen)
                     if len(reply.split()) >= max_words:
                         break  # bench cap: don't let playback bleed into the next trial
-            if buf.strip() and not delegate_rest and self.gen == gen:
+            if buf.strip() and not delegate_rest and self.gen == gen and out is not None:
+                out.say(buf.strip())
+            elif buf.strip() and not delegate_rest and self.gen == gen:
                 wav = await self._speak(buf.strip())
                 if wav:
                     if first_audio is None:
@@ -1033,7 +1271,7 @@ class WatsonAgent(FrameProcessor):
             # two tries on the talker, then one on the fallback model:
             # glm-5.3-flash sometimes streams an empty reply twice in a row
             # (bench 13-22-28: turn-taking miss), the fallback answers instead
-            tries = [TALKER_MODEL, TALKER_MODEL]
+            tries = [TALKER_MODEL] if LLM_FAST else [TALKER_MODEL, TALKER_MODEL]
             if FALLBACK_MODEL and FALLBACK_MODEL != TALKER_MODEL:
                 tries.append(FALLBACK_MODEL)
             for attempt, model in enumerate(tries, 1):
@@ -1051,6 +1289,11 @@ class WatsonAgent(FrameProcessor):
                         or self.gen != gen):
                     break  # got something (or superseded): don't retry
                 self.log_event("llm_empty_retry", attempt=attempt, user=text)
+            ack = None
+            if calls and self.gen == gen and TOOL_ACK and first_audio is None:
+                ack = self._play_ack(gen)
+                if ack is not None:
+                    first_audio = time.perf_counter()
             if calls and self.gen == gen:
                 self.history.append({"role": "assistant", "content": None, "tool_calls": [
                     {"id": s["id"], "type": "function",
@@ -1061,20 +1304,24 @@ class WatsonAgent(FrameProcessor):
                         args = json.loads(s["args"] or "{}")
                     except json.JSONDecodeError:
                         args = {}
+                    mark("tool_start", name=s["name"])
                     if s["name"] == "set_timer":
                         out = self._set_timer_local(int(args.get("seconds", 0)),
                                                     args.get("label", "your timer"))
                     else:
                         out = await asyncio.to_thread(self.chatbrain.execute_tool,
                                                       s["name"], args)
+                    mark("tool_end", name=s["name"])
                     self.log_event("tool", name=s["name"], args=args, out=str(out)[:80])
                     self.history.append({"role": "tool", "tool_call_id": s["id"],
                                          "content": out})
                 reply = ""
                 delegate_rest = False
-                await one_pass(self.history, False)
+                await one_pass(self.history, False, after=ack)
             if delegate_rest:
-                rest = reply.split("DELEGATE:", 1)[1].strip().rstrip(".!")
+                # first line only: the talker may add a spoken line after it
+                rest = reply.split("DELEGATE:", 1)[1].strip().splitlines()[0].strip().rstrip(".!") \
+                    if reply.split("DELEGATE:", 1)[1].strip() else ""
                 if rest:
                     ack = await self._delegate(rest, gen, user_text=text)
                     reply = ack
@@ -1091,7 +1338,12 @@ class WatsonAgent(FrameProcessor):
                 self.barged = False
             total = time.perf_counter() - t0
             if reply.strip():
+                self._collapse_tools(user_msg)
                 self.history.append({"role": "assistant", "content": reply})
+                if self.gen == gen and reply.rstrip().endswith("?"):
+                    # Watson asked something: a 1-2 word answer within 10 s
+                    # is a reply, not a fragment (Nov 6: "halo-halo" dropped)
+                    self.answer_until = time.monotonic() + _ANSWER_WINDOW_S
             ft = max(0.0, (first_token or t_asr) - t0)
             fa = max(0.0, (first_audio if first_audio is not None else total) - t0)
             self.log_event("turn", user=text, reply=reply,
@@ -1100,7 +1352,94 @@ class WatsonAgent(FrameProcessor):
                            first_audio_s=round(fa, 3),
                            total_s=round(total, 3))
 
+    # ---- streaming ASR (Deepgram live) -------------------------------------
+    def _live_open(self, first: bytes = b""):
+        """Speech onset: start a Deepgram live session and feed it `first`
+        (pre-roll or barge probe audio). Any older session is dropped."""
+        if self.asr_live is not None:
+            self.asr_live.cancel()
+            self.asr_live = None
+        if not (ASR_STREAM and ME3_ASR == "deepgram"):
+            return
+        # take the pre-connected spare: a socket opened at onset needs ~1 s
+        # (TLS + Deepgram setup on the Pi), so a short phrase reached
+        # Deepgram in one late burst and its transcript lagged the endpoint
+        # by 0.4-1.0 s (bench 2026-11-07_08-41-31)
+        live, self.asr_spare = self.asr_spare, None
+        if live is None or live.done.is_set():
+            if live is not None:
+                live.cancel()
+            live = _DGLive(self)
+        self.asr_live = live
+        if first:
+            live.feed(first)
+        self.asr_spare = _DGLive(self)   # ready for the next utterance
+
+    def _live_feed(self, pcm: bytes):
+        if self.asr_live is not None:
+            self.asr_live.feed(pcm)
+
+    async def _asr_utterance(self, pcm16: bytes, live=None) -> str:
+        """Transcript of a finished utterance: the live session's result
+        when it has one, else the REST call on the whole utterance."""
+        if live is not None:
+            text = await live.text(timeout=1.5)
+            if text is not None:
+                self.log_event("asr_stream", ms_after_end=live.ms_after_end())
+                return text
+            self.log_event("asr_stream_fallback", err=live.err)
+        return await self._asr(pcm16)
+
+    # ---- tool ack -----------------------------------------------------------
+    async def _warm_acks(self):
+        for phrase in TOOL_ACK_PHRASES:
+            try:
+                pcm = bytearray()
+                async for piece in self._speak_chunks_raw(phrase):
+                    pcm += piece
+                if pcm:
+                    self.ack_pcm[phrase] = bytes(pcm[:len(pcm) // 2 * 2])
+            except Exception as e:
+                self.log_event("ack_warm_error", err=repr(e)[:120])
+        self.ack_pcm.pop(None, None)
+        self.log_event("acks_ready", n=len(self.ack_pcm))
+
+    def _play_ack(self, gen: int):
+        """Start a cached ack phrase; returns its task, or None when no
+        phrase is cached yet (never synthesizes on the hot path)."""
+        ready = [p for p in TOOL_ACK_PHRASES if self.ack_pcm.get(p)]
+        if not ready:
+            return None
+        phrase = ready[self.ack_i % len(ready)]
+        self.ack_i += 1
+        self.log_event("tool_ack", phrase=phrase)
+        self.playing = True
+        return asyncio.create_task(self._play_pcm(self.ack_pcm[phrase], gen))
+
+    async def _speak_chunks_raw(self, text: str):
+        """Deepgram PCM for a fixed phrase, without stage marks."""
+        url, hdr, body = _dg_speak_request(text, raw=True)
+        async with self.http.stream("POST", url, headers=hdr, json=body) as r:
+            if r.status_code != 200:
+                return
+            async for piece in r.aiter_bytes():
+                if piece:
+                    yield piece
+
     async def _asr(self, pcm16: bytes) -> str:
+        if ME3_ASR == "deepgram":
+            params = [("model", DG_ASR_MODEL), ("language", "en"), ("smart_format", "true")]
+            params += [("keyterm", k) for k in DG_KEYTERMS]
+            r = await self.http.post(
+                f"{DG_URL}/listen", params=params, content=_wav_bytes(pcm16, _IN_SR),
+                headers={"Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}",
+                         "Content-Type": "audio/wav"})
+            if r.status_code != 200:
+                self.log_event("asr_error", backend="deepgram", status=r.status_code,
+                               body=r.text[:120])
+                return ""
+            alt = r.json()["results"]["channels"][0]["alternatives"][0]
+            return (alt.get("transcript") or "").strip()
         if ME3_ASR == "dgx3":
             b64 = base64.b64encode(_wav_bytes(pcm16, _IN_SR)).decode()
             r = await self.http.post(
@@ -1121,6 +1460,26 @@ class WatsonAgent(FrameProcessor):
         return (r.json() or {}).get("text", "")
 
     async def _speak(self, text: str):
+        # never read a file path, file name or URL aloud (user rule, Nov 6)
+        text = self.chatbrain.speakable(text)
+        if not text:
+            return None
+        if ME3_TTS == "deepgram":
+            self.spoken_tokens |= _token_set(text)
+            mark("tts_request")
+            url, hdr, body = _dg_speak_request(text)
+            try:
+                r = await self.http.post(url, headers=hdr, json=body)
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
+                # server-closed keep-alive socket (live announce crash, Nov 7)
+                self.log_event("tts_retry", err=repr(e)[:120])
+                r = await self.http.post(url, headers=hdr, json=body)
+            if r.status_code != 200:
+                self.log_event("tts_error", backend="deepgram", status=r.status_code,
+                               body=r.text[:120])
+                return None
+            mark("tts_first_audio")
+            return r.content
         if ME3_TTS == "dgx3":
             r = await self.http.post(
                 f"{DGX3}:8001/v1/audio/speech",
@@ -1130,11 +1489,67 @@ class WatsonAgent(FrameProcessor):
                 return None
             return r.content
         self.spoken_tokens |= _token_set(text)
+        mark("tts_request")
         r = await self.http.post(f"{SERVER}/speak",
                                  json={"text": text, "voice": TTS_VOICE})
         if r.status_code != 200:
             return None
+        mark("tts_first_audio")   # /speak returns the whole sentence at once
         return r.content
+
+    async def _speak_chunks(self, text: str):
+        """Async generator of 24 kHz 16-bit PCM pieces for one sentence.
+        Deepgram streams raw PCM as it is generated (first bytes in a few
+        hundred ms); the other backends yield the whole sentence at once."""
+        text = self.chatbrain.speakable(text)
+        if not text:
+            return
+        if ME3_TTS != "deepgram":
+            wav = await self._speak(text)
+            if wav:
+                yield _wav_pcm(wav)
+            return
+        self.spoken_tokens |= _token_set(text)
+        mark("tts_request")
+        url, hdr, body = _dg_speak_request(text, raw=True)
+        first = True
+        for attempt in (1, 2):
+            try:
+                async for piece in self._dg_tts_stream(url, hdr, body):
+                    if first:
+                        mark("tts_first_audio")
+                        first = False
+                    yield piece
+                return
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
+                # a pooled keep-alive connection the server already closed:
+                # retry once on a fresh one, unless audio already went out
+                if not first or attempt == 2:
+                    raise
+                self.log_event("tts_retry", err=repr(e)[:120])
+
+    async def _dg_tts_stream(self, url, hdr, body):
+        async with self.http.stream("POST", url, headers=hdr, json=body) as r:
+            if r.status_code != 200:
+                err = (await r.aread())[:120]
+                self.log_event("tts_error", backend="deepgram", status=r.status_code,
+                               body=err.decode("utf-8", "replace"))
+                return
+            async for piece in r.aiter_bytes():
+                if piece:
+                    yield piece
+
+    async def _dg_warm(self):
+        """Endpoint reached: touch api.deepgram.com so the pooled HTTPS
+        connection is open when the first TTS request goes out. With ASR on
+        the websocket nothing else uses that connection between turns, and
+        the first sentence paid a fresh TLS handshake (~0.45 s on the Pi,
+        bench 2026-11-07_08-02-07) or hit a server-closed socket."""
+        try:
+            await self.http.get(f"{DG_URL}/projects", headers={
+                "Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}"})
+        except Exception:
+            pass
 
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
@@ -1182,6 +1597,7 @@ class WatsonAgent(FrameProcessor):
         played = 0
         prebuffer = 6  # first 300 ms pushed at once: slack against loop stalls
         n_seg = 0
+        marked_out = False
         while played < len(pcm):
             if self.gen != gen:
                 # interrupted: stash the unplayed PCM so we can resume
@@ -1192,15 +1608,264 @@ class WatsonAgent(FrameProcessor):
             ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
             self.played16 = np.concatenate([self.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
             await self.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
+            if not marked_out:
+                mark("audio_out")
+                marked_out = True
             self.last_active = time.monotonic()   # speaking = activity (idle timer)
             n_seg += 1
             if n_seg > prebuffer:
                 await asyncio.sleep(chunk / _OUT_SR * 0.92)  # slightly faster than real time
 
+    def _collapse_tools(self, user_msg):
+        """Drop this turn's tool-call and tool-result messages once the turn
+        has its final spoken reply: later turns only need what was said. A
+        web search alone is ~1,000 characters that used to ride along for
+        the next 12 messages."""
+        idx = next((i for i, m in enumerate(self.history) if m is user_msg), None)
+        if idx is None:
+            return
+        end = next((j for j in range(idx + 1, len(self.history))
+                    if self.history[j].get("role") == "user"), len(self.history))
+        keep = [m for m in self.history[idx + 1:end]
+                if m.get("role") != "tool" and not m.get("tool_calls")]
+        self.history[idx + 1:end] = keep
+
     def log_event(self, event: str, **kw):
         rec = {"t": round(time.time(), 3), "event": event, **kw}
         with open(self.log_dir / "watson_log.jsonl", "a") as f:
             f.write(json.dumps(rec) + "\n")
+
+
+_LIVE_FIN = object()
+_LIVE_CANCEL = object()
+
+
+class _DGLive:
+    """One Deepgram live-transcription websocket per utterance.
+
+    Opened at speech onset; feed() queues 16 kHz PCM while the user talks
+    (audio queued before the socket is open is sent once it opens).
+    finish() at the endpoint sends Finalize + CloseStream; text() then waits
+    for the flushed result. text() returns None on any failure so the
+    caller can fall back to the REST call."""
+
+    def __init__(self, agent):
+        self.a = agent
+        self.q: asyncio.Queue = asyncio.Queue()
+        self.finals: list[str] = []
+        self.done = asyncio.Event()
+        self.ok = False
+        self.err = None
+        self.t_finish = None
+        self.t_done = None
+        self.task = asyncio.create_task(self._run())
+
+    def feed(self, pcm: bytes):
+        self.q.put_nowait(pcm)
+
+    def finish(self):
+        self.t_finish = time.perf_counter()
+        self.q.put_nowait(_LIVE_FIN)
+
+    def cancel(self):
+        self.q.put_nowait(_LIVE_CANCEL)
+
+    def ms_after_end(self):
+        if self.t_finish is None or self.t_done is None:
+            return None
+        return round((self.t_done - self.t_finish) * 1000)
+
+    async def text(self, timeout: float):
+        try:
+            await asyncio.wait_for(asyncio.shield(self.done.wait()), timeout)
+        except asyncio.TimeoutError:
+            self.err = self.err or "timeout"
+            self.cancel()
+            return None
+        if not self.ok:
+            return None
+        return " ".join(self.finals).strip()
+
+    def _url(self) -> str:
+        from urllib.parse import urlencode
+        q = [("model", DG_ASR_MODEL), ("language", "en"), ("smart_format", "true"),
+             ("encoding", "linear16"), ("sample_rate", str(_IN_SR)), ("channels", "1"),
+             ("interim_results", "false")]
+        q += [("keyterm", k) for k in DG_KEYTERMS]
+        return "wss://api.deepgram.com/v1/listen?" + urlencode(q)
+
+    async def _run(self):
+        import websockets
+        reader = None
+        try:
+            async with websockets.connect(
+                    self._url(), open_timeout=5, max_size=None,
+                    additional_headers={"Authorization":
+                                        f"Token {_env_key('DEEPGRAM_API_KEY')}"}) as ws:
+                async def read():
+                    async for msg in ws:
+                        if not isinstance(msg, str):
+                            continue
+                        d = json.loads(msg)
+                        if d.get("type") == "Metadata" and self.t_finish is not None:
+                            # sent after the last result of a CloseStream
+                            self.ok = True
+                            self.t_done = time.perf_counter()
+                            self.done.set()
+                            continue
+                        if d.get("type") != "Results":
+                            continue
+                        if d.get("is_final"):
+                            alt = (d.get("channel") or {}).get("alternatives") or [{}]
+                            t = (alt[0].get("transcript") or "").strip()
+                            if t:
+                                self.finals.append(t)
+                        # do NOT stop at the first from_finalize result: more
+                        # final results can follow it (full bench 08-16-56 lost
+                        # trailing words: "Text Alex. I'll be"). The server
+                        # closes the socket after CloseStream once all are sent.
+                    # socket closed by the server after CloseStream: all
+                    # results are in
+                    if self.t_finish is not None:
+                        self.ok = True
+                reader = asyncio.create_task(read())
+                while True:
+                    try:
+                        item = await asyncio.wait_for(self.q.get(), 4.0)
+                    except asyncio.TimeoutError:
+                        # idle spare: Deepgram closes a socket after ~10 s
+                        # without audio or a KeepAlive
+                        await ws.send(json.dumps({"type": "KeepAlive"}))
+                        continue
+                    if item is _LIVE_CANCEL:
+                        return
+                    if item is _LIVE_FIN:
+                        await ws.send(json.dumps({"type": "Finalize"}))
+                        await ws.send(json.dumps({"type": "CloseStream"}))
+                        break
+                    await ws.send(item)
+                try:
+                    await asyncio.wait_for(asyncio.shield(reader), 4.0)
+                except asyncio.TimeoutError:
+                    self.err = "close timeout"
+        except Exception as e:
+            self.err = repr(e)[:160]
+        finally:
+            if reader is not None and not reader.done():
+                reader.cancel()
+            self.t_done = self.t_done or time.perf_counter()
+            self.done.set()
+
+
+class _SpeechOut:
+    """Streaming speech for one LLM pass (TTS_STREAM).
+
+    say(text) queues a sentence. A synth task turns queued sentences into
+    PCM pieces in order (Deepgram streams them), and a player task pushes
+    those pieces as 50 ms frames, paced like _play_pcm. Sentence N+1 is
+    synthesized while sentence N plays, and the LLM stream is never blocked
+    by playback. On a barge (gen bumped) the player stashes every buffered,
+    unplayed sample in agent.resume_pcm, so a backchannel resume replays
+    more than the rest of the current sentence."""
+
+    FRAME = 1200      # samples per frame: 50 ms at 24 kHz
+    PREBUFFER = 6     # first 300 ms pushed at once: slack against loop stalls
+
+    def __init__(self, agent, gen: int, after=None):
+        self.a, self.gen = agent, gen
+        self.after = after   # task still playing (tool ack): play after it
+        self.texts: asyncio.Queue = asyncio.Queue()
+        self.pcm: asyncio.Queue = asyncio.Queue()
+        self.first_audio = None
+        self._synth = asyncio.create_task(self._run_synth())
+        self._player = asyncio.create_task(self._run_player())
+
+    def say(self, text: str):
+        self.texts.put_nowait(text)
+
+    async def finish(self):
+        """Wait until everything said has played (or the turn was barged)."""
+        self.texts.put_nowait(None)
+        try:
+            await self._player
+        finally:
+            if not self._synth.done():
+                self._synth.cancel()
+
+    def _live(self) -> bool:
+        return self.a.gen == self.gen
+
+    async def _run_synth(self):
+        from contextlib import aclosing
+        try:
+            while self._live():
+                text = await self.texts.get()
+                if text is None:
+                    break
+                async with aclosing(self.a._speak_chunks(text)) as pieces:
+                    async for piece in pieces:
+                        if not self._live():
+                            break
+                        self.pcm.put_nowait(piece)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            self.a.log_event("tts_stream_error", err=repr(e)[:160])
+        finally:
+            self.pcm.put_nowait(None)
+
+    async def _run_player(self):
+        from pipecat.frames.frames import OutputAudioRawFrame
+        a = self.a
+        need = self.FRAME * 2
+        buf = bytearray()
+        done = False
+        n_seg = 0
+        if self.after is not None:
+            try:
+                await asyncio.shield(self.after)
+            except Exception:
+                pass
+        while True:
+            if not self._live():
+                # barged: keep everything not yet played for a resume
+                rest = bytes(buf)
+                while not self.pcm.empty():
+                    piece = self.pcm.get_nowait()
+                    if piece:
+                        rest += piece
+                rest = rest[:len(rest) // 2 * 2]
+                if rest:
+                    a.resume_pcm = rest
+                return
+            if len(buf) < need and not done:
+                try:
+                    piece = await asyncio.wait_for(self.pcm.get(), 0.05)
+                except asyncio.TimeoutError:
+                    continue
+                if piece is None:
+                    done = True
+                else:
+                    buf += piece
+                continue
+            if not buf:
+                return   # synth finished and everything played
+            seg = bytes(buf[:need])
+            del buf[:need]
+            seg = seg[:len(seg) // 2 * 2]
+            if not seg:
+                continue
+            ref = _resample(np.frombuffer(seg, dtype=np.int16), _OUT_SR, _IN_SR)
+            a.played16 = np.concatenate([a.played16, ref])[-int(_ECHO_HIST_S * _IN_SR):]
+            if self.first_audio is None:
+                self.first_audio = time.perf_counter()
+                mark("audio_out")
+            a.playing = True
+            await a.push_frame(OutputAudioRawFrame(seg, _OUT_SR, 1))
+            a.last_active = time.monotonic()   # speaking = activity (idle timer)
+            n_seg += 1
+            if n_seg > self.PREBUFFER:
+                await asyncio.sleep(self.FRAME / _OUT_SR * 0.92)
 
 
 def _emit_point(buf: str) -> int:

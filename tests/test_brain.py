@@ -15,7 +15,7 @@ try:
 except ImportError:
     print("SKIP  chat.py not importable (deprecated)")
 names = {t["function"]["name"] for t in brain.QUICK_TOOLS}
-check("15 tools", len(names) == 15, sorted(names))
+check("10 tools (get_time_in removed, spotify_* merged into music)", len(names) == 10 and "music" in names and "get_time_in" not in names, sorted(names))
 out = brain.execute_tool("get_time", {});            check("get_time", "local time" in out, out[:60])
 out = brain.execute_tool("get_time_in", {"city": "Tokyo"}); check("get_time_in Tokyo", "Tokyo" in out and "Asia/Tokyo" in out, out[:60])
 out = brain.execute_tool("web_search", {"query": "capital of Australia"}); check("web_search", out.startswith("Web results"), out[:60])

@@ -4,48 +4,37 @@ Moved out of chat.py (deprecated) on 2026-11-05. pipecat_assistant.py
 imports this module; it has no audio or loop code, so it loads on the Pi
 without sounddevice or torch.
 """
+import re
 import time
 
 import home  # noqa: E402  (Spotify + virtual smart home)
 
 
-SYSTEM_PROMPT = (
-    "You are a voice assistant in a live spoken conversation. Reply in ONE or TWO short "
-    "sentences, plain text, no markdown, no lists, no emoji. Be conversational and brief. "
-    "You do NOT do tasks yourself — workers handle everything in the background, and "
-    "several can run at once. "
-    "You have tools: get_time (local), get_time_in (exact time in other cities), web_search, "
-    "and smart-home tools: spotify_play/pause/next/prev/volume (music + media control), "
-    "lights_control (on/off, brightness, color), thermostat_set, set_alarm, add_reminder, "
-    "list_items, contact_message (calls/messages are logged in the sandbox only). Handle "
-    "music, lights, thermostat, timers, alarms, reminders and messages YOURSELF with these "
-    "tools — never delegate them. get_time reports the machine's LOCAL time only; "
-    "get_time_in is exact for other cities (never web_search or guess times). Use "
-    "web_search for facts you don't know. NEVER reply with a bare offer like 'would you "
-    "like me to...' — always act. Never mention tools. "
-    "Song lyrics, poems, jokes, quotes and creative text: answer from your OWN "
-    "knowledge — never web_search them and never DELEGATE them (search finds no lyrics; "
-    "if asked for 'the next line', recite it directly). "
-    "EVERYTHING else that requires any action — building anything, timers, reminders, "
-    "notes, lookups, research, files, calculations — delegate with a reply that starts "
-    "with the tag 'DELEGATE:' followed by a one-line restatement of the request, "
-    "e.g. 'DELEGATE: a one-page website about Tokyo trips'. The tag is machine-read "
-    "(never spoken aloud), so always start delegation replies with it exactly. "
-    "If the request is incomplete or ambiguous — no topic given, key details missing, "
-    "or you are unsure what they want — do NOT use the DELEGATE tag; instead ask ONE "
-    "short, natural clarifying question (e.g. 'Sure — a website about what, exactly?'). "
-    "Remember details the user tells you within this conversation."
-)
+# v4 (Nov 6, owner-approved): short version of the owner's v3 prompt, same
+# rules in the same order (~230 tokens vs ~540). Measured: prompt size moves
+# glm-5.3-flash TTFT by only ~0.2-0.5 s; it was trimmed for context hygiene.
+_PROMPT_OWNER = """You are Watson, a voice assistant in a live spoken conversation. Reply in one or two short spoken sentences, plain text, no markdown or emoji; give more detail only when asked.
+When a request is clear, act with the right tool without offering first. If a needed detail is missing, ask one short question.
+Handle music, lights, thermostat, timers, alarms, reminders and messages yourself with their tools.
+Say an action is done only after the tool confirms it; say clearly if it is pending or failed.
+For news, facts you are unsure of, and the time in other cities, use web_search; never guess. If the search doesn't settle it, say so briefly.
+Never mention tools or internal details.
+After an interruption, follow the user's latest request; an action already submitted still stands unless they cancel it."""
+
+# Runtime protocol: pipecat_assistant parses a reply that starts with
+# "DELEGATE:" and hands the job to the background agent (task MCP server).
+_PROMPT_DELEGATE = """
+Big jobs (sites, apps, research, files) go to the background agent: reply DELEGATE: <one-line request>. Never speak the tag. If the job has no topic yet ("build me a website"), ask what it should be about first."""
+
+SYSTEM_PROMPT = _PROMPT_OWNER + _PROMPT_DELEGATE
 
 
 QUICK_TOOLS = [
-    {"type": "function", "function": {"name": "get_time", "description": "Get the current date and local time (instant, not a task).",
+    {"type": "function", "function": {"name": "get_time", "description": "Get today's date and the LOCAL time here. Only for 'what time or date is it here'. Never for news, results, events or other cities.",
                                       "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "get_time_in", "description": "Get the exact current time in a specific city or country. ALWAYS use this for times in other places — never web_search and never guess.",
-                                      "parameters": {"type": "object", "properties": {
-                                          "city": {"type": "string", "description": "City or country name, e.g. Mumbai, Tokyo, London"}}},
-                                      "required": ["city"]}},
-    {"type": "function", "function": {"name": "web_search", "description": "Search the web for facts, news, prices, or anything you are unsure about. Returns titles and snippets.",
+    # get_time_in removed from the talker's tools (owner, Nov 6): city times
+    # go to web_search. Its handler in execute_tool stays for old callers.
+    {"type": "function", "function": {"name": "web_search", "description": "Search the web for facts, news, sports and election results, prices, the current time in another city, or anything you are unsure about. Returns titles and snippets.",
                                       "parameters": {"type": "object", "properties": {
                                           "query": {"type": "string", "description": "Search query"}}},
                                       "required": ["query"]}},
@@ -53,13 +42,13 @@ QUICK_TOOLS = [
                                       "parameters": {"type": "object", "properties": {
                                           "seconds": {"type": "integer"},
                                           "label": {"type": "string"}}, "required": ["seconds"]}}},
-    {"type": "function", "function": {"name": "spotify_play", "description": "Play music on Spotify. Pass a song, artist, genre or mood as the query.",
-                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "spotify_pause", "description": "Pause the music.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_next", "description": "Skip to the next track.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_prev", "description": "Go back to the previous track.", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "spotify_volume", "description": "Set the music volume (0-100).",
-                                      "parameters": {"type": "object", "properties": {"percent": {"type": "integer"}}, "required": ["percent"]}}},
+    # one schema instead of five spotify_* (tool schemas go out on every call)
+    {"type": "function", "function": {"name": "music", "description": "Control music: play a song, artist, genre or mood; pause; next; previous; or set volume.",
+                                      "parameters": {"type": "object", "properties": {
+                                          "action": {"type": "string", "enum": ["play", "pause", "next", "previous", "volume"]},
+                                          "query": {"type": "string", "description": "what to play (action=play)"},
+                                          "percent": {"type": "integer", "description": "0-100 (action=volume)"}},
+                                      "required": ["action"]}}},
     {"type": "function", "function": {"name": "lights_control", "description": "Control the smart lights: turn on/off, set brightness percent or color.",
                                       "parameters": {"type": "object", "properties": {
                                           "light": {"type": "string", "description": "Light name, e.g. living room"},
@@ -77,6 +66,35 @@ QUICK_TOOLS = [
     {"type": "function", "function": {"name": "contact_message", "description": "Log a call or message to a contact (sandbox only, no real calls).",
                                       "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["call", "message"]}, "who": {"type": "string"}, "text": {"type": "string"}}, "required": ["who"]}}},
 ]
+
+
+_URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.I)
+# "~/anything" or an absolute path with 2+ segments ("24/7", "and/or" survive)
+_PATH_RE = re.compile(r"~/[\w.\-/]*|(?<!\w)/[\w.\-]+(?:/[\w.\-]+)+/?")
+_FILE_RE = re.compile(r"\b[\w\-]+\.(?:html?|css|js|py|txt|md|json|pdf|png|jpe?g|csv|sb|log)\b", re.I)
+
+
+def speakable(text: str) -> str:
+    """Strip what must never be read aloud: URLs, file paths, file names.
+    ('Saved to ~/sandbox/task07/index.html' -> 'Saved to')"""
+    t = _URL_RE.sub("", text or "")
+    t = _PATH_RE.sub("", t)
+    t = _FILE_RE.sub("", t)
+    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
+    t = re.sub(r"\(\s*\)|\[\s*\]", "", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
+def local_web_search(query: str) -> str:
+    try:
+        from ddgs import DDGS
+        results = DDGS().text(query, max_results=5, region="wt-wt")
+        if not results:
+            return "No results found."
+        lines = [f"- {r.get('title','')}: {r.get('body','')[:200]}" for r in results]
+        return "Web results:\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Search failed: {e}"
 
 
 def execute_tool(name, args):
@@ -110,20 +128,33 @@ def execute_tool(name, args):
         return (f"The current time in {city.title()} is "
                 f"{now.strftime('%H:%M on %A, %B %d, %Y')} (zone: {tzname}).")
     if name == "web_search":
-        try:
-            from ddgs import DDGS
-            query = args.get("query", "")
-            results = DDGS().text(query, max_results=5, region="wt-wt")
-            if not results:
-                return "No results found."
-            lines = [f"- {r.get('title','')}: {r.get('body','')[:200]}" for r in results]
-            return "Web results:\n" + "\n".join(lines)
-        except Exception as e:
-            return f"Search failed: {e}"
+        query = args.get("query", "")
+        # Pi: hand unknown facts to the Mac's browser tool (tasks_mcp.py),
+        # which also shows the search on the demo screen. The Pi venv has
+        # no ddgs, so local search is only the Mac/fallback path.
+        import mcp_client
+        if mcp_client.enabled():
+            try:
+                return mcp_client.call("browse", timeout=25.0, query=query)
+            except Exception as e:
+                local = local_web_search(query)
+                return local if not local.startswith("Search failed") else f"Search failed: {e}"
+        return local_web_search(query)
     if name == "set_timer":
         # timers must speak through the caller's own audio path:
         # pipecat_assistant intercepts set_timer (_set_timer_local)
         return "set_timer must be handled by the voice pipeline."
+    if name == "music":
+        act = (args.get("action") or "").lower()
+        target = {"play": "spotify_play", "pause": "spotify_pause", "next": "spotify_next",
+                  "previous": "spotify_prev", "prev": "spotify_prev",
+                  "volume": "spotify_volume"}.get(act)
+        if not target:
+            return f"Unknown music action {act!r}."
+        sub = {"query": args.get("query", "")} if target == "spotify_play" else (
+            {"percent": args.get("percent", 50)} if target == "spotify_volume" else {})
+        return home.do_tool(target, sub)
+    # spotify_* stay callable directly (the dashboard's buttons use them)
     if name in ("spotify_play", "spotify_pause", "spotify_next", "spotify_prev",
                 "spotify_volume", "lights_control", "thermostat_set", "set_alarm",
                 "add_reminder", "list_items", "contact_message"):
