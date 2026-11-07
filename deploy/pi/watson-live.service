@@ -1,0 +1,18 @@
+[Unit]
+Description=Watson voice assistant (pipecat_assistant.py --mic)
+After=pipewire.service wireplumber.service pipewire-pulse.service
+Wants=pipewire.service wireplumber.service pipewire-pulse.service
+
+[Service]
+# run_live.sh is itself a restart loop; systemd restarts the loop if bash dies
+ExecStart=/bin/bash %h/me3/run_live.sh
+# At boot, run_live.sh sets the USB mic gain before PipeWire/WirePlumber have
+# settled, and they restore it to 100% (clips the owner). Re-apply the mic
+# gain (81%) and speaker volume (0.8) once audio has settled. Verified Nov 7:
+# after a replug the mic sat at 100% without this.
+ExecStartPost=/bin/bash -c 'sleep 25; amixer -c 3 sset Mic 81%% >/dev/null 2>&1; wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.8 >/dev/null 2>&1; true'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

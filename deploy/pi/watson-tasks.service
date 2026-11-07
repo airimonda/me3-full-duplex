@@ -1,0 +1,11 @@
+[Unit]
+Description=Watson task MCP server + pi.dev agent (tasks_mcp.py, :8320)
+
+[Service]
+# run_tasks_mcp.sh is itself a restart loop; systemd restarts the loop if bash dies
+ExecStart=/bin/bash %h/me3/run_tasks_mcp.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
