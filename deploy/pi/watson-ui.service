@@ -1,0 +1,11 @@
+[Unit]
+Description=Watson UI (ui_server.py, :8301)
+
+[Service]
+# run_ui.sh is itself a restart loop; systemd restarts the loop if bash dies
+ExecStart=/bin/bash %h/me3/run_ui.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

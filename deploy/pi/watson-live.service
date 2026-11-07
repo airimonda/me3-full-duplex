@@ -1,0 +1,13 @@
+[Unit]
+Description=Watson voice assistant (pipecat_assistant.py --mic)
+After=pipewire.service wireplumber.service pipewire-pulse.service
+Wants=pipewire.service wireplumber.service pipewire-pulse.service
+
+[Service]
+# run_live.sh is itself a restart loop; systemd restarts the loop if bash dies
+ExecStart=/bin/bash %h/me3/run_live.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

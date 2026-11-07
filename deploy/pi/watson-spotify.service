@@ -1,0 +1,13 @@
+[Unit]
+Description=Watson Spotify Connect player (librespot "Watson")
+After=pipewire.service pipewire-pulse.service
+Wants=pipewire.service pipewire-pulse.service
+
+[Service]
+# run_spotify.sh is itself a restart loop (and waits for DNS before signing in)
+ExecStart=/bin/bash %h/me3/run_spotify.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
