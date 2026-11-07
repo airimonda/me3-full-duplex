@@ -242,7 +242,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
           <tr><td><b>VAD</b></td><td>in-process</td><td>SileroVADAnalyzer(frames)</td><td>Silero VAD (ONNX)</td><td>RPi on-device, 16 kHz mono; start 0.1 s, stop 0.6 s</td></tr>
           <tr><td><b>Speaker ID</b></td><td>in-process (speakerid.py)</td><td>similarity(pcm, profile)</td><td>resemblyzer (GE2E)</td><td>RPi; answers the session holder (≥ 0.60); saying "Watson" claims the session; echo check vs Watson's voice (0.44)</td></tr>
           <tr><td><b>Tasks</b></td><td><b>tasks_mcp.py</b> / streamable HTTP :8320 (MCP)</td><td>submit_task(request), list_tasks(), finished(), browse(query)</td><td>pi.dev 1.5 agent on glm-5.3-flash; search: DuckDuckGo (ddgs)</td><td>RPi; agent under bubblewrap in ~/sandbox; result opens on the Mac via the Watson UI; 10 s for a one-page site</td></tr>
-          <tr><td><b>Quick tools</b></td><td>in-process <span class="mono">brain.execute_tool</span> <span class="dev">(not MCP)</span></td><td>get_time, web_search, music, lights, thermostat, timers, alarms, reminders</td><td>n/a</td><td>RPi; home state is virtual (JSON); web_search goes through browse (spoken only)</td></tr>
+          <tr><td><b>Quick tools</b></td><td>in-process <span class="mono">brain.execute_tool</span> <span class="dev">(not MCP)</span></td><td>get_time, web_search, music, lights, thermostat, timers, alarms, reminders</td><td>n/a</td><td>RPi; music: Spotify Connect on the Pi (librespot "Watson", ducked while Watson talks); home state is virtual (JSON)</td></tr>
         </tbody>
       </table>
     </div>
