@@ -42,7 +42,7 @@ footer.foot { position: absolute; left: 64px; right: 64px; bottom: 10px; border-
 footer.foot b { color: var(--muted); }
 /* page 1 */
 .p1 { display: grid; grid-template-columns: 640px 1fr; grid-template-rows: auto 1fr; gap: 6px 26px; height: 100%; }
-.diag svg { display: block; width: 520px; height: 229px; }
+.diag svg { display: block; width: 640px; height: 218px; }
 .bar { background: var(--navy); color: #fff; font-family: var(--mono); font-size: 10.5px; text-align: center; padding: 5px 6px; border-radius: 4px; margin-top: 5px; }
 .barge { color: var(--orange); font-family: var(--mono); font-weight: 700; font-size: 10px; text-align: center; margin-top: 3px; }
 .prompt { padding: 5px 9px; font-family: var(--font); font-size: 9.8px; line-height: 1.27; }
@@ -85,87 +85,80 @@ tr:nth-child(even) td { background: #f5f7fa; }
       <!-- 1 SYSTEM DIAGRAM -->
       <div class="diag">
         <div class="sec"><span class="num">1</span><h2>SYSTEM DIAGRAM</h2><span class="hint">the one diagram that explains the build</span></div>
-        <svg viewBox="0 0 640 282" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+        <svg viewBox="0 0 640 218" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
           <defs>
-            <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="#18233f"/></marker>
-            <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c4472b"/></marker>
-            <marker id="ag" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="#8a93a3"/></marker>
+            <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="#18233f"/></marker>
+            <marker id="ao" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="#e8742a"/></marker>
+            <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c4472b"/></marker>
+            <marker id="ag" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" fill="#8a93a3"/></marker>
           </defs>
 
           <!-- zones -->
-          <rect x="1" y="1" width="356" height="280" rx="7" fill="#fff4ec" stroke="#e8742a" stroke-width="1.5"/>
-          <text x="12" y="17" font-size="11.5" font-weight="700" fill="#e8742a">RASPBERRY PI 4 · 4 GB</text>
-          <rect x="468" y="1" width="171" height="192" rx="7" fill="#f2f2f2" stroke="#8a93a3" stroke-width="1.2" stroke-dasharray="4 3"/>
-          <text x="478" y="17" font-size="11.5" font-weight="700" fill="#5d6676">CLOUD</text>
-          <rect x="468" y="203" width="171" height="78" rx="7" fill="#eef3fb" stroke="#18233f" stroke-width="1"/>
-          <text x="478" y="219" font-size="11.5" font-weight="700" fill="#18233f">MAC</text>
+          <rect x="0.75" y="0.75" width="371" height="216.5" rx="7" fill="#fff4ec" stroke="#e8742a" stroke-width="1.5"/>
+          <text x="12" y="16" font-size="10.5" font-weight="700" fill="#e8742a">RASPBERRY PI 4 · 4 GB</text>
+          <rect x="388" y="0.75" width="251" height="151" rx="7" fill="#f2f2f2" stroke="#8a93a3" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <text x="400" y="16" font-size="10.5" font-weight="700" fill="#5d6676">CLOUD</text>
+          <rect x="388" y="161" width="251" height="56" rx="7" fill="#eef3fb" stroke="#18233f"/>
+          <text x="400" y="177" font-size="10.5" font-weight="700" fill="#18233f">MAC</text>
 
-          <!-- Pi: audio in/out column -->
-          <rect x="14" y="32" width="112" height="36" rx="4" fill="#fff" stroke="#18233f"/>
-          <text x="70" y="47" font-size="11" text-anchor="middle" font-weight="700">USB mic</text>
-          <text x="70" y="60" font-size="9.4" text-anchor="middle" fill="#5d6676">16 kHz mono</text>
+          <!-- Pi: audio column -->
+          <rect x="12" y="26" width="110" height="38" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="67" y="42" font-size="11" text-anchor="middle" font-weight="700">USB mic</text>
+          <text x="67" y="56" font-size="9.5" text-anchor="middle" fill="#5d6676">16 kHz mono</text>
 
-          <rect x="14" y="88" width="112" height="36" rx="4" fill="#fff" stroke="#18233f"/>
-          <text x="70" y="103" font-size="11" text-anchor="middle" font-weight="700">Silero VAD</text>
-          <text x="70" y="116" font-size="9.4" text-anchor="middle" fill="#5d6676">0.6 s endpoint</text>
+          <rect x="12" y="76" width="110" height="38" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="67" y="92" font-size="11" text-anchor="middle" font-weight="700">Silero VAD</text>
+          <text x="67" y="106" font-size="9.5" text-anchor="middle" fill="#5d6676">0.6 s endpoint</text>
 
-          <rect x="14" y="190" width="112" height="36" rx="4" fill="#fff" stroke="#18233f"/>
-          <text x="70" y="205" font-size="11" text-anchor="middle" font-weight="700">Speaker</text>
-          <text x="70" y="218" font-size="9.4" text-anchor="middle" fill="#5d6676">streams as it plays</text>
+          <rect x="12" y="126" width="110" height="38" rx="4" fill="#fff" stroke="#18233f"/>
+          <text x="67" y="142" font-size="11" text-anchor="middle" font-weight="700">Speaker</text>
+          <text x="67" y="156" font-size="9.5" text-anchor="middle" fill="#5d6676">streamed audio</text>
 
-          <!-- Pi: agent -->
-          <rect x="150" y="32" width="192" height="132" rx="5" fill="#fff" stroke="#e8742a" stroke-width="1.8"/>
-          <text x="246" y="52" font-size="12" text-anchor="middle" font-weight="700">WatsonAgent</text>
-          <text x="246" y="65" font-size="9.4" text-anchor="middle" fill="#5d6676">Pipecat 1.15 · one FrameProcessor</text>
-          <text x="164" y="98" font-size="10.2">owner voice gate</text>
-          <text x="164" y="119" font-size="10.2">barge-in check</text>
-          <text x="164" y="140" font-size="10.2">10 tools · last 12 messages</text>
+          <text x="12" y="186" font-size="9.5" font-weight="700" fill="#c4472b">barge-in</text>
+          <text x="12" y="200" font-size="9.5" fill="#c4472b">stop · wait · Watson</text>
 
-          <!-- Pi: task MCP -->
-          <rect x="150" y="190" width="192" height="44" rx="4" fill="#fff" stroke="#e8742a" stroke-width="1.4"/>
-          <text x="246" y="207" font-size="10.6" text-anchor="middle" font-weight="700">Task MCP (ours) :8320</text>
-          <text x="246" y="222" font-size="9.4" text-anchor="middle" fill="#5d6676">pi.dev agent, sandboxed</text>
+          <!-- Pi: agent + task MCP -->
+          <rect x="138" y="26" width="222" height="138" rx="5" fill="#fff" stroke="#e8742a" stroke-width="1.8"/>
+          <text x="249" y="45" font-size="12" text-anchor="middle" font-weight="700">WatsonAgent</text>
+          <text x="249" y="59" font-size="9.5" text-anchor="middle" fill="#5d6676">Pipecat 1.15 · one FrameProcessor</text>
+          <line x1="152" y1="70" x2="346" y2="70" stroke="#f3c9ad"/>
+          <text x="152" y="91" font-size="10.5">owner voice gate</text>
+          <text x="152" y="113" font-size="10.5">barge-in check</text>
+          <text x="152" y="135" font-size="10.5">10 tools · last 12 messages</text>
+          <text x="152" y="155" font-size="9.5" fill="#5d6676">Watson UI :8301 · JSONL log</text>
 
-          <text x="14" y="262" font-size="9.4" fill="#5d6676">Watson UI :8301 · JSONL log per run</text>
+          <rect x="138" y="174" width="222" height="34" rx="4" fill="#fff" stroke="#e8742a" stroke-width="1.4"/>
+          <text x="249" y="188" font-size="10.5" text-anchor="middle" font-weight="700">Task MCP (ours) :8320</text>
+          <text x="249" y="201" font-size="9.5" text-anchor="middle" fill="#5d6676">pi.dev agent, sandboxed</text>
 
           <!-- Pi arrows -->
-          <line x1="70" y1="68" x2="70" y2="87" stroke="#18233f" marker-end="url(#a)"/>
-          <line x1="126" y1="106" x2="149" y2="106" stroke="#18233f" marker-end="url(#a)"/>
-          <path d="M150,150 L138,150 L138,208 L127,208" fill="none" stroke="#18233f" marker-end="url(#a)"/>
-          <line x1="246" y1="164" x2="246" y2="189" stroke="#e8742a" stroke-width="1.3" marker-end="url(#a)"/>
-          <!-- barge-in -->
-          <path d="M14,50 L6,50 L6,208 L13,208" fill="none" stroke="#c4472b" stroke-width="1.4" stroke-dasharray="3 2" marker-end="url(#ar)"/>
-          <text x="14" y="160" font-size="9.4" fill="#c4472b" font-weight="700">barge-in:</text>
-          <text x="14" y="171" font-size="9" fill="#c4472b">stop · wait · Watson</text>
+          <line x1="67" y1="64" x2="67" y2="75" stroke="#18233f" marker-end="url(#a)"/>
+          <line x1="122" y1="95" x2="137" y2="95" stroke="#18233f" marker-end="url(#a)"/>
+          <line x1="138" y1="145" x2="123" y2="145" stroke="#18233f" marker-end="url(#a)"/>
+          <line x1="249" y1="164" x2="249" y2="173" stroke="#e8742a" stroke-width="1.3" marker-end="url(#ao)"/>
+          <path d="M12,45 L5,45 L5,145 L11,145" fill="none" stroke="#c4472b" stroke-width="1.4" stroke-dasharray="3 2" marker-end="url(#ar)"/>
 
           <!-- cloud -->
-          <rect x="480" y="30" width="148" height="52" rx="4" fill="#fff" stroke="#e8742a" stroke-width="1.4"/>
-          <text x="554" y="46" font-size="11" text-anchor="middle" font-weight="700">Deepgram</text>
-          <text x="554" y="59" font-size="9.4" text-anchor="middle">ASR nova-3 · TTS Aura-2</text>
-          <text x="554" y="72" font-size="9" text-anchor="middle" fill="#5d6676">both streamed</text>
+          <rect x="400" y="26" width="227" height="42" rx="4" fill="#fff" stroke="#e8742a" stroke-width="1.4"/>
+          <text x="513" y="43" font-size="11" text-anchor="middle" font-weight="700">Deepgram</text>
+          <text x="513" y="58" font-size="9.5" text-anchor="middle">ASR nova-3 · TTS Aura-2 · streamed</text>
 
-          <rect x="480" y="94" width="148" height="40" rx="4" fill="#fff" stroke="#8a93a3"/>
-          <text x="554" y="110" font-size="11" text-anchor="middle" font-weight="700">OpenRouter</text>
-          <text x="554" y="123" font-size="9.4" text-anchor="middle">glm-5.3-flash</text>
+          <rect x="400" y="76" width="227" height="36" rx="4" fill="#fff" stroke="#8a93a3"/>
+          <text x="513" y="91" font-size="11" text-anchor="middle" font-weight="700">OpenRouter</text>
+          <text x="513" y="105" font-size="9.5" text-anchor="middle">glm-5.3-flash</text>
 
-          <rect x="480" y="146" width="148" height="34" rx="4" fill="#fff" stroke="#8a93a3"/>
-          <text x="554" y="161" font-size="11" text-anchor="middle" font-weight="700">Web search</text>
-          <text x="554" y="173" font-size="9.4" text-anchor="middle" fill="#5d6676">DuckDuckGo</text>
+          <rect x="400" y="120" width="227" height="24" rx="4" fill="#fff" stroke="#8a93a3"/>
+          <text x="513" y="136" font-size="10" text-anchor="middle"><tspan font-weight="700">Web search</tspan><tspan fill="#5d6676"> · DuckDuckGo</tspan></text>
 
           <!-- agent <-> cloud -->
-          <line x1="343" y1="56" x2="479" y2="56" stroke="#e8742a" stroke-width="1.3" marker-start="url(#a)" marker-end="url(#a)"/>
-          <text x="411" y="51" font-size="9" text-anchor="middle" fill="#5d6676">audio ⇄ text</text>
-          <line x1="343" y1="114" x2="479" y2="114" stroke="#18233f" marker-start="url(#a)" marker-end="url(#a)"/>
-          <text x="411" y="109" font-size="9" text-anchor="middle" fill="#5d6676">prompt ⇄ tokens</text>
-          <line x1="343" y1="160" x2="479" y2="160" stroke="#8a93a3" marker-end="url(#ag)"/>
-          <text x="411" y="155" font-size="9" text-anchor="middle" fill="#5d6676">tool call</text>
+          <line x1="361" y1="47" x2="399" y2="47" stroke="#e8742a" stroke-width="1.4" marker-start="url(#ao)" marker-end="url(#ao)"/>
+          <line x1="361" y1="94" x2="399" y2="94" stroke="#18233f" marker-start="url(#a)" marker-end="url(#a)"/>
+          <line x1="361" y1="132" x2="399" y2="132" stroke="#8a93a3" marker-end="url(#ag)"/>
 
           <!-- Mac -->
-          <text x="478" y="235" font-size="9.6">fdbench harness</text>
-          <text x="478" y="249" font-size="9.6">result viewer (mac_show.py)</text>
-          <text x="478" y="263" font-size="9.4" fill="#5d6676">fallback Whisper + Kokoro</text>
-          <line x1="343" y1="226" x2="467" y2="246" stroke="#8a93a3" stroke-dasharray="3 2" marker-end="url(#ag)"/>
-          <text x="400" y="228" font-size="9" text-anchor="middle" fill="#5d6676">finished tasks</text>
+          <text x="400" y="193" font-size="9.8">fdbench harness · result viewer</text>
+          <text x="400" y="207" font-size="9.5" fill="#5d6676">fallback Whisper + Kokoro</text>
+          <line x1="361" y1="191" x2="387" y2="191" stroke="#8a93a3" stroke-dasharray="3 2" marker-end="url(#ag)"/>
         </svg>
         <div class="bar">mic → VAD (RPi) → ASR (Deepgram) → agent + tools (RPi) → LLM (cloud) → TTS (Deepgram) → speaker</div>
         <div class="barge">barge-in: owner voice + stop word → flush TTS + drop LLM stream → listen</div>
