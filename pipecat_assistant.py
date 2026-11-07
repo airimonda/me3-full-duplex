@@ -46,6 +46,8 @@ TALKER_MODEL = os.environ.get("ME3_TALKER_MODEL", "z-ai/glm-5.3-flash")
 TTS_VOICE = os.environ.get("ME3_TTS_VOICE", "am_michael")
 # answers when the talker streams empty twice in a row ("" disables)
 FALLBACK_MODEL = os.environ.get("ME3_FALLBACK_MODEL", "openai/gpt-4o-mini")
+# reasoning effort for the talker ("" = provider default); see one_pass_body
+TALKER_REASONING = os.environ.get("ME3_TALKER_REASONING", "low").strip()
 
 # ASR / TTS backends: "local" (server.py on the Mac) or "dgx3" (class vLLM GPU server)
 ME3_ASR = os.environ.get("ME3_ASR", "local")   # local | dgx3 | deepgram
@@ -1175,6 +1177,14 @@ class WatsonAgent(FrameProcessor):
                 body["tools"] = self.tools
             if LLM_FAST:
                 body["provider"] = {"sort": "latency"}
+            # glm-5.3-flash always reasons (OpenRouter: "Reasoning is mandatory
+            # ... cannot be disabled"). At the default effort a confusing turn
+            # (a spelled-out name) reasoned past max_tokens and streamed NO
+            # content: llm_empty_retry -> fallback, 6-10 s to first audio.
+            # Nov 7 probe on the Pi: effort "low" = 1-3 reasoning tokens, tool
+            # call every time, first chunk 1.2-2.4 s; default = empty 2/2.
+            if model == TALKER_MODEL and TALKER_REASONING:
+                body["reasoning"] = {"effort": TALKER_REASONING}
             # exact prompt tokens for fdbench's context-size section: OpenRouter
             # puts usage in the last stream chunk -> llm_usage mark below
             body["usage"] = {"include": True}
