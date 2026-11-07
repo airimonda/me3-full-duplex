@@ -183,7 +183,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
           <text x="575" y="175" font-size="9.6" text-anchor="middle" font-weight="700">Deepgram</text>
           <text x="575" y="188" font-size="8.2" text-anchor="middle">ASR nova-3</text>
           <text x="575" y="199" font-size="8.2" text-anchor="middle">TTS aura-2-jupiter</text>
-          <text x="575" y="212" font-size="7.6" text-anchor="middle" fill="#5d6676">called from the RPi</text>
+          <text x="575" y="212" font-size="7.6" text-anchor="middle" fill="#5d6676">both streamed, from the RPi</text>
           <path d="M290,120 C380,150 450,190 519,192" fill="none" stroke="#e8742a" stroke-width="1.3" marker-end="url(#a)"/>
           <rect x="324" y="210" width="166" height="56" rx="4" fill="#fff" stroke="#18233f"/>
           <text x="407" y="224" font-size="9.6" text-anchor="middle" font-weight="700">Mac tools</text>
@@ -199,9 +199,9 @@ tr:nth-child(even) td { background: #f5f7fa; }
       <!-- right of diagram -->
       <div>
         <ul class="dash" style="font-size:9.6px; gap:2px; margin-top:22px; line-height:1.3">
-          <li>Mic → VAD on the RPi → <b>Deepgram ASR</b> (nova-3, called from the RPi) → agent on the RPi → <b>Deepgram TTS</b> (Aura-2 Jupiter) → speaker on the RPi.</li>
+          <li>Mic → VAD on the RPi → <b>Deepgram ASR</b> (nova-3, live websocket fed while the user talks) → agent on the RPi → <b>Deepgram TTS</b> (Aura-2 Jupiter, audio played as it streams in) → speaker on the RPi.</li>
           <li>Harness: <b>Pipecat 1.15</b>, one FrameProcessor (WatsonAgent). Stock transports only; the same agent runs the live mic and the benchmark socket.</li>
-          <li>LLM: <b>z-ai/glm-5.3-flash</b> via OpenRouter, streaming with function calling. 20 s read timeout, one retry, then <b>gpt-4o-mini</b>.</li>
+          <li>LLM: <b>z-ai/glm-5.3-flash</b> via OpenRouter, streaming with function calling. 20 s read timeout; an empty stream goes straight to <b>gpt-4o-mini</b>. Tool turns say "One sec." while the tool runs.</li>
           <li><b>Task MCP on the RPi:</b> tasks_mcp.py (streamable HTTP) takes big jobs and web lookups. Jobs run the <b>pi.dev</b> agent under bubblewrap, writing only in ~/sandbox; the Watson UI (ui_server.py, also on the Pi) serves the result and the Mac opens it; Watson announces it at the next pause, never reading a path.</li>
           <li><span class="dev">Deviation from the brief:</span> ASR and TTS are commercial APIs (Deepgram) called directly from the RPi, not through our own MCP servers. Quick tools (lights, timers) are in-process calls. The Mac's Whisper/Kokoro server stays as a fallback.</li>
           <li>Second MCP built by us: <b>tts_mcp.py</b> (EfficientSpeech Tiny, tools <span class="mono">speak</span>, <span class="mono">health</span>). Tested on the Mac; not in the live loop.</li>
@@ -268,9 +268,9 @@ tr:nth-child(even) td { background: #f5f7fa; }
       <table>
         <thead><tr><th style="width:84px">Component</th><th style="width:210px">Server / transport</th><th style="width:250px">Tools</th><th style="width:230px">Model</th><th>Served where / notes</th></tr></thead>
         <tbody>
-          <tr><td><b>ASR</b></td><td>Deepgram <span class="mono">/v1/listen</span>, HTTPS <span class="dev">(not MCP)</span></td><td>listen(wav) → text</td><td>nova-3; keyterms "Watson" + demo words</td><td>called from the RPi; one final transcript per VAD endpoint, with 400 ms pre-roll</td></tr>
-          <tr><td><b>TTS</b></td><td>Deepgram <span class="mono">/v1/speak</span>, HTTPS; MCP: tts_mcp.py (stdio, HTTP)</td><td>speak(text) → wav; MCP: speak, health</td><td>Aura-2 aura-2-jupiter-en; MCP: EfficientSpeech Tiny</td><td>called from the RPi; one request per sentence, played in 50 ms chunks; flushed on barge-in</td></tr>
-          <tr><td><b>LLM</b></td><td>WatsonAgent (Pipecat harness), OpenAI-compatible streaming</td><td>function calling, 10 tools</td><td>z-ai/glm-5.3-flash; fallback openai/gpt-4o-mini</td><td>Cloud (OpenRouter); 20 s read timeout, 1 retry, then fallback</td></tr>
+          <tr><td><b>ASR</b></td><td>Deepgram <span class="mono">/v1/listen</span>, HTTPS <span class="dev">(not MCP)</span></td><td>listen(wav) → text</td><td>nova-3; keyterms "Watson" + demo words</td><td>called from the RPi; live websocket opened at speech onset (400 ms pre-roll), Finalize at the VAD endpoint: transcript ~0.25 s later; REST fallback</td></tr>
+          <tr><td><b>TTS</b></td><td>Deepgram <span class="mono">/v1/speak</span>, HTTPS; MCP: tts_mcp.py (stdio, HTTP)</td><td>speak(text) → wav; MCP: speak, health</td><td>Aura-2 aura-2-jupiter-en; MCP: EfficientSpeech Tiny</td><td>called from the RPi; one streamed request per sentence, played as bytes arrive (next sentence synthesized during playback); flushed on barge-in</td></tr>
+          <tr><td><b>LLM</b></td><td>WatsonAgent (Pipecat harness), OpenAI-compatible streaming</td><td>function calling, 10 tools</td><td>z-ai/glm-5.3-flash; fallback openai/gpt-4o-mini</td><td>Cloud (OpenRouter, latency-sorted providers); 20 s read timeout, empty stream → fallback</td></tr>
           <tr><td><b>VAD</b></td><td>in-process</td><td>SileroVADAnalyzer(frames)</td><td>Silero VAD (ONNX)</td><td>RPi on-device, 16 kHz mono; start 0.1 s, stop 0.6 s</td></tr>
           <tr><td><b>Speaker ID</b></td><td>in-process (speakerid.py)</td><td>similarity(pcm, profile)</td><td>resemblyzer (GE2E)</td><td>RPi; answers the session holder (≥ 0.60); saying "Watson" claims the session; echo check vs Watson's voice (0.44)</td></tr>
           <tr><td><b>Tasks</b></td><td><b>tasks_mcp.py</b> / streamable HTTP :8320 (MCP)</td><td>submit_task(request), list_tasks(), finished(), browse(query)</td><td>pi.dev 1.5 agent on glm-5.3-flash; search: DuckDuckGo (ddgs)</td><td>RPi; agent under bubblewrap in ~/sandbox; result opens on the Mac via the Watson UI; 10 s for a one-page site</td></tr>

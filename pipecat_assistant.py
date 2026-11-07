@@ -1657,6 +1657,12 @@ class _DGLive:
                         if not isinstance(msg, str):
                             continue
                         d = json.loads(msg)
+                        if d.get("type") == "Metadata" and self.t_finish is not None:
+                            # sent after the last result of a CloseStream
+                            self.ok = True
+                            self.t_done = time.perf_counter()
+                            self.done.set()
+                            continue
                         if d.get("type") != "Results":
                             continue
                         if d.get("is_final"):
@@ -1664,10 +1670,10 @@ class _DGLive:
                             t = (alt[0].get("transcript") or "").strip()
                             if t:
                                 self.finals.append(t)
-                        if d.get("from_finalize") and self.t_finish is not None:
-                            self.ok = True
-                            self.t_done = time.perf_counter()
-                            self.done.set()
+                        # do NOT stop at the first from_finalize result: more
+                        # final results can follow it (full bench 08-16-56 lost
+                        # trailing words: "Text Alex. I'll be"). The server
+                        # closes the socket after CloseStream once all are sent.
                     # socket closed by the server after CloseStream: all
                     # results are in
                     if self.t_finish is not None:
