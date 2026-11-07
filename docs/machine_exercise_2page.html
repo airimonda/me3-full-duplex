@@ -207,11 +207,11 @@ tr:nth-child(even) td { background: #f5f7fa; }
             <h3>MANAGED:</h3>
             <ul class="dash">
               <li>History capped at the last 12 messages, cut at a user turn so no tool reply loses its call</li>
-              <li>Why: TTFT 1.1–2.0 s at 2 msgs vs 2.0–3.7 s at 54</li>
+              <li>Why: the first token arrives later as the context grows</li>
               <li>Tool calls and results dropped once the turn is answered</li>
               <li>idle (5 min) → listen → think → speak</li>
               <li>On barge-in: generation++, stale audio and stream dropped</li>
-              <li>Measured (fdbench, Nov 7): 1,670 prompt tokens per call median (max 1,994), 12 messages (max 15)</li>
+              <li>Measured (fdbench): 1,665 prompt tokens per call median (max 2,107), 12 messages (max 15)</li>
             </ul>
           </div>
         </div>
@@ -253,23 +253,23 @@ tr:nth-child(even) td { background: #f5f7fa; }
         <ul class="dash" style="font-size:11.2px">
           <li>One clock: the Pi's <span class="mono">time.monotonic</span>; Watson sends a stage mark at each step over the benchmark socket.</li>
           <li>Stages: <span class="mono">vad_end → asr_final → llm_first_token → tts_first_audio → audio_out</span>. E2E is measured by fdbench from the audio itself.</li>
-          <li>Nov 7: 30 timed turns + Full-Duplex-Bench, 2 rounds of 50 trials. Assistant on the Pi, harness on the Mac, 9 ms Wi-Fi.</li>
-          <li>Full-Duplex-Bench (n = 2 per group): pause take-overs 0/4, interruptions handled 2/2 (judge 5.0/5), answered speech not meant for it 0/4, backchannel resume 1/2, turn-taking missed 1/2.</li>
+          <li>30 timed turns (10 phrases × 3) + Full-Duplex-Bench, 3 rounds (30 trials). Assistant on the Pi, harness on the Mac over Wi-Fi.</li>
+          <li>Full-Duplex-Bench (n = 3 per group): interruptions handled 3/3 (judge 5.0/5), backchannel resume 2/3, pause take-overs 1/6, turn-taking missed 1/3, answered speech not meant for it 2/6 (side talk; TV, noise and background 0).</li>
         </ul>
       </div>
       <div>
         <table class="eval">
           <thead><tr><th>Metric</th><th>Definition</th><th style="width:56px">Target</th><th style="width:52px">Mean</th><th style="width:52px">p95</th><th style="width:60px">Median</th></tr></thead>
           <tbody>
-            <tr><td><b>E2E latency</b></td><td>end of speech → audio out</td><td class="n">4.0 s</td><td class="n">2.67</td><td class="n">3.93</td><td class="n">2.56</td></tr>
-            <tr><td><b>ASR final</b></td><td>end of speech → transcript</td><td class="n">0.8 s</td><td class="n">0.26</td><td class="n">0.30</td><td class="n">0.24</td></tr>
-            <tr><td><b>LLM TTFT</b></td><td>transcript → first token</td><td class="n">1.5 s</td><td class="n">2.11</td><td class="n">3.26</td><td class="n">1.99</td></tr>
-            <tr><td><b>TTS TTFB</b></td><td>text → first audio</td><td class="n">0.6 s</td><td class="n">0.31</td><td class="n">0.40</td><td class="n">0.29</td></tr>
-            <tr><td><b>Barge-in</b></td><td>overlap → playback stopped</td><td class="n">0.8 s</td><td class="n" colspan="3" style="text-align:center">0.75 / 0.76 s (FD-Bench t_stop, 2 trials)</td></tr>
-            <tr><td><b>WER</b></td><td>ASR accuracy, 10 phrases × 3</td><td class="n">0.15</td><td class="n">0.12</td><td class="n" colspan="2" style="text-align:center">1 run, 30 turns</td></tr>
+            <tr><td><b>E2E latency</b></td><td>end of speech → audio out</td><td class="n">4.0 s</td><td class="n">3.20</td><td class="n">6.27</td><td class="n">2.57</td></tr>
+            <tr><td><b>ASR final</b></td><td>end of speech → transcript</td><td class="n">0.8 s</td><td class="n">0.34</td><td class="n">0.42</td><td class="n">0.28</td></tr>
+            <tr><td><b>LLM TTFT</b></td><td>transcript → first token</td><td class="n">1.5 s</td><td class="n">2.48</td><td class="n">4.78</td><td class="n">2.02</td></tr>
+            <tr><td><b>TTS TTFB</b></td><td>text → first audio</td><td class="n">0.6 s</td><td class="n">0.43</td><td class="n">1.45</td><td class="n">0.30</td></tr>
+            <tr><td><b>Barge-in</b></td><td>overlap → playback stopped</td><td class="n">0.8 s</td><td class="n" colspan="3" style="text-align:center">0.77 / 0.79 s (mean / p95, 3 trials)</td></tr>
+            <tr><td><b>WER</b></td><td>ASR accuracy, 10 phrases × 3</td><td class="n">0.15</td><td class="n">0.11</td><td class="n" colspan="2" style="text-align:center">30 turns</td></tr>
           </tbody>
         </table>
-        <div style="font-size:9px;color:var(--muted);margin-top:3px">Seconds, fdbench run 2026-11-07_10-10-53. Targets: course defaults. Before streaming (Nov 6, 3 runs): E2E median 4.91, ASR 0.93, TTS 1.60.</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Seconds, fdbench run 2026-11-07_11-22-33 on the Pi. Targets: course defaults. The E2E p95 comes from language-model spikes (LLM p95 4.78 s).</div>
       </div>
     </div>
 
@@ -288,15 +288,15 @@ tr:nth-child(even) td { background: #f5f7fa; }
       </div>
       <div class="panel box">
         <h3>RESULTS</h3>
-        <div>Stage medians on the Pi, Nov 7 (E2E median 2.56 s, p95 3.93 s; target 4.0 s; Nov 6: 4.91 s):</div>
+        <div>Stage medians on the Pi (E2E median 2.57 s; target 4.0 s):</div>
         <div class="chart">
-          <span style="flex:0.24;background:#1d7a86" title="ASR 0.24 s"></span>
-          <span style="flex:1.99;background:#e8742a">LLM first token 1.99</span>
-          <span style="flex:0.29;background:#18233f" title="TTS 0.29 s"></span>
-          <span style="flex:2.39;background:#e3e6eb;color:#5d6676">saved vs Nov 6</span>
+          <span style="flex:0.28;background:#1d7a86" title="ASR 0.28 s"></span>
+          <span style="flex:2.02;background:#e8742a">LLM first token 2.02</span>
+          <span style="flex:0.30;background:#18233f" title="TTS 0.30 s"></span>
+          <span style="flex:1.40;background:#e3e6eb;color:#5d6676">headroom to target</span>
         </div>
-        <div class="legend"><span>0</span><span>ASR 0.24</span><span>2.23</span><span>+TTS 0.29 = 2.52</span><span>4.91 s (Nov 6)</span></div>
-        <div style="margin-top:5px"><b>Pi:</b> Raspberry Pi 4 Model B Rev 1.1, 4 GB, no fan, peak 73 °C, never throttled; Wi-Fi, 9 ms to the harness.
+        <div class="legend"><span>0</span><span>ASR 0.28</span><span>2.30</span><span>+TTS 0.30 = 2.60</span><span>4.0 s target</span></div>
+        <div style="margin-top:5px"><b>Pi:</b> Raspberry Pi 4 Model B Rev 1.1, 4 GB, no fan, peak 74 °C, never throttled; Wi-Fi to the harness.
         <b>Date:</b> Nov 7, 2026. <b>Models:</b> Deepgram nova-3 + aura-2-jupiter-en (both streamed), glm-5.3-flash, Silero VAD, Pipecat 1.15.</div>
       </div>
       <div class="panel box">
@@ -311,7 +311,7 @@ tr:nth-child(even) td { background: #f5f7fa; }
     </div>
 
   </div>
-  <footer class="foot"><span>Machine Exercise · Full-Duplex Voice Agent on Raspberry Pi</span><span>red = deviation from the template brief · stats: fdbench on the Pi, Nov 7</span><b>2-page template · 2/2</b></footer>
+  <footer class="foot"><span>Machine Exercise · Full-Duplex Voice Agent on Raspberry Pi</span><span>red = deviation from the template brief · stats: fdbench on the Pi, 3 rounds</span><b>2-page template · 2/2</b></footer>
 </section>
 
 </body>
