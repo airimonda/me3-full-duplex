@@ -1137,15 +1137,18 @@ class WatsonAgent(FrameProcessor):
             out = _SpeechOut(self, gen, after=after) if TTS_STREAM else None
             if out is None and after is not None:
                 await after   # old path: let the ack finish before speaking
+            streams = []
             try:
-                return await one_pass_body(msgs, use_tools, model, out)
+                return await one_pass_body(msgs, use_tools, model, out, streams)
             finally:
+                for st in streams:
+                    await st.aclose()
                 if out is not None:
                     await out.finish()
                     if first_audio is None and out.first_audio is not None:
                         first_audio = out.first_audio
 
-        async def one_pass_body(msgs, use_tools, model, out):
+        async def one_pass_body(msgs, use_tools, model, out, streams):
             """One streaming LLM pass. Accumulates tool calls; emits TTS
             sentence-by-sentence; returns the tool calls (if any)."""
             nonlocal first_token, first_audio, reply, delegate_rest
@@ -1166,9 +1169,14 @@ class WatsonAgent(FrameProcessor):
             chars = sum(len(json.dumps(m.get("content") or "")) for m in msgs) + \
                 (len(json.dumps(body["tools"])) if use_tools else 0)
             mark("llm_request", messages=len(msgs), chars=chars, est_tokens=chars // 4)
-            stream = await self.http.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self.key}"}, json=body)
+            # send(stream=True): read SSE lines as they arrive. A plain post()
+            # downloaded the WHOLE reply first, so "first token" was really the
+            # complete reply (Nov 7 finding); the 20 s read timeout still
+            # applies per read.
+            stream = await self.http.send(self.http.build_request(
+                "POST", "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.key}"}, json=body), stream=True)
+            streams.append(stream)
             self.log_event("llm_http", status=stream.status_code,
                            model=model, n_msgs=len(msgs),
                            n_tools=len(body.get("tools", [])))
