@@ -1160,8 +1160,12 @@ class WatsonAgent(FrameProcessor):
                 body["tools"] = self.tools
             if LLM_FAST:
                 body["provider"] = {"sort": "latency"}
-            mark("llm_request", messages=len(msgs),
-                 chars=sum(len(str(m.get("content") or "")) for m in msgs))
+            # exact prompt tokens for fdbench's context-size section: OpenRouter
+            # puts usage in the last stream chunk -> llm_usage mark below
+            body["usage"] = {"include": True}
+            chars = sum(len(json.dumps(m.get("content") or "")) for m in msgs) + \
+                (len(json.dumps(body["tools"])) if use_tools else 0)
+            mark("llm_request", messages=len(msgs), chars=chars, est_tokens=chars // 4)
             stream = await self.http.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}"}, json=body)
@@ -1177,7 +1181,16 @@ class WatsonAgent(FrameProcessor):
                 if data == "[DONE]":
                     break
                 try:
-                    d = json.loads(data)["choices"][0]["delta"]
+                    obj = json.loads(data)
+                    u = obj.get("usage")
+                    if u and u.get("prompt_tokens"):
+                        mark("llm_usage", prompt_tokens=u["prompt_tokens"],
+                             completion_tokens=u.get("completion_tokens"))
+                        self.log_event("llm_usage", prompt_tokens=u["prompt_tokens"],
+                                       completion_tokens=u.get("completion_tokens"))
+                    if not obj.get("choices"):
+                        continue   # usage-only chunk
+                    d = obj["choices"][0]["delta"]
                 except Exception:
                     if "error" in data or self._bad_logged < 3:
                         self.log_event("llm_bad_line", line=data[:200])
