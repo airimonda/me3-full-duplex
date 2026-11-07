@@ -214,6 +214,23 @@ def tasks_scan():
     return out[:6]
 
 
+LIVE_VIEW = os.path.join(os.path.dirname(LOG_PATH), "live.json")
+
+
+@app.get("/api/live")
+async def api_live():
+    """The turn in progress (pipecat_assistant mic mode writes live.json):
+    your words as Deepgram hears them, then Watson's sentences as spoken.
+    Cheap to poll fast, unlike /api/state, which re-reads the whole log."""
+    try:
+        with open(LIVE_VIEW) as f:
+            v = json.load(f)
+    except (OSError, ValueError):
+        v = {}
+    v["now"] = time.time()
+    return JSONResponse(v)
+
+
 @app.get("/api/state")
 async def api_state():
     msgs = []
