@@ -41,6 +41,8 @@ section { display: grid; gap: 14px; }
   border-left: 3px solid var(--coral); padding: 2px 0 2px 18px; max-width: 68ch;
 }
 .say p + p { margin-top: 10px; }
+/* presenter lines rotate: one phrasing per page load (first one without JS) */
+.rot > .v + .v { display: none; }
 .note { color: var(--muted); font-size: 0.92rem; }
 code, .cmd { font-family: var(--mono); font-size: 0.86rem; }
 .cmd {
@@ -105,17 +107,19 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 
 <section>
   <h2><span class="t">0:00 · 30 s</span> Opening</h2>
-  <div class="say">
-    <p>Most voice assistants are walkie-talkies: you talk, they talk, and nobody interrupts. Watson is full duplex. It listens while it speaks, so you can cut it off, talk over it, or say "yeah" without derailing it.</p>
-    <p>It also has to decide who it is listening to. Its own voice comes back through the microphone, and so does everyone else in this room. I'll show you how it handles both.</p>
+  <div class="say rot">
+    <div class="v"><p>Most voice assistants are walkie-talkies: you talk, they talk, and nobody interrupts. Watson is full duplex. It listens while it speaks, so you can cut it off, talk over it, or say "yeah" without derailing it.</p><p>It also has to decide who it is listening to. Its own voice comes back through the microphone, and so does everyone else in this room. I'll show you how it handles both.</p></div>
+    <div class="v"><p>Most voice assistants take turns like a walkie-talkie: one side talks, then the other, and nobody cuts in. Watson is full duplex. It keeps listening while it speaks, so you can interrupt it, talk over it, or say "yeah" and it keeps going.</p><p>The other half of the problem is knowing who to listen to. The microphone hears Watson's own voice, and everyone else in this room too. I'll show you how it deals with both.</p></div>
+    <div class="v"><p>A normal voice assistant waits for its turn and can't be interrupted. Watson is full duplex: it listens the whole time it talks. Cut it off, talk over it, or just say "yeah", and it copes.</p><p>It also has to work out who is talking to it. Its own voice comes back through the mic, and so does everyone in this room. Here's how it handles both.</p></div>
   </div>
 </section>
 
 <section>
   <h2><span class="t">0:30 · 60 s</span> How it works</h2>
-  <div class="say">
-    <p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. Speech recognition and Watson's voice come from Deepgram, called straight from the Pi, and a fast language model, GLM 5.3 Flash, writes the replies and calls the tools. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the finished page opens on my Mac the moment it's done.</p>
-    <p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. The recognizer used to hear "Watson" as "button" or "Hudson". Part of that was us: the first syllable was being cut off before it reached the recognizer. Now we keep the audio from just before you start speaking, and Deepgram is primed with the word "Watson".</p>
+  <div class="say rot">
+    <div class="v"><p>The Raspberry Pi is the ears and mouth. It runs voice activity detection, end-of-turn detection, interruption handling and playback. Speech recognition and Watson's voice come from Deepgram, called straight from the Pi, and a fast language model, GLM 5.3 Flash, writes the replies and calls the tools. Everything is one Pipecat pipeline. Big jobs go to an MCP server we built that runs on the Pi: it hands them to a coding agent, pi.dev, locked inside a sandbox folder, and the finished page opens on my Mac the moment it's done.</p><p>Two problems took most of the work. First, echo. The speaker is as loud at the mic as I am, and hardware echo cancellation gave us almost nothing. So Watson decides by who is speaking: it compares each interruption against its own voice and against my enrolled voice. Second, my accent. The recognizer used to hear "Watson" as "button" or "Hudson". Part of that was us: the first syllable was being cut off before it reached the recognizer. Now we keep the audio from just before you start speaking, and Deepgram is primed with the word "Watson".</p></div>
+    <div class="v"><p>Think of the Raspberry Pi as the ears and the mouth. On the Pi: voice activity detection, end-of-turn detection, interruption handling and playback. Deepgram, called directly from the Pi, turns speech into text and gives Watson its voice. A fast language model, GLM 5.3 Flash, writes each reply and calls the tools. It is all one Pipecat pipeline. Big jobs go to an MCP server we wrote, also on the Pi, which passes them to the pi.dev coding agent inside a sandbox folder; when the page is finished, it opens on my Mac.</p><p>Most of the work went into two problems. The first is echo: the speaker reaches the mic as loudly as I do, and hardware echo cancellation barely helped. So Watson decides by voice: every interruption is compared with its own voice and with my enrolled voice. The second is my accent: "Watson" used to come out as "button" or "Hudson". Some of that was our bug, the first syllable was cut off before the recognizer got it. Now we keep the audio from just before you start talking, and Deepgram is primed with the word "Watson".</p></div>
+    <div class="v"><p>The Pi does the listening and the speaking: voice activity detection, end-of-turn detection, interruptions and playback. Speech recognition and the voice are Deepgram, called straight from the Pi. GLM 5.3 Flash, a fast language model, writes the replies and calls the tools, all inside one Pipecat pipeline. For big jobs we built an MCP server on the Pi; it hands the job to pi.dev, a coding agent locked in a sandbox folder, and the result opens on my Mac as soon as it's ready.</p><p>Two things were hard. Echo: at the mic, the speaker is as loud as I am, and hardware echo cancellation gave almost nothing, so Watson tells voices apart instead, checking each interruption against its own voice and my enrolled voice. And my accent: the recognizer heard "Watson" as "button" or "Hudson", partly because we were cutting off the first syllable. We now keep the audio from just before speech starts, and Deepgram is primed with "Watson".</p></div>
   </div>
 </section>
 
@@ -128,7 +132,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson"</span></dd>
         <dt>Expect</dt><dd>"Yes? I'm listening." about 2 s later.</dd>
-        <dt>Tell class</dt><dd>It still accepts the old mishearings ("button", "Hudson") as a safety net for my accent.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">It still accepts the old mishearings ("button", "Hudson") as a safety net for my accent.</span><span class="v">As a safety net for my accent, it still accepts the old mishearings, "button" and "Hudson".</span><span class="v">The old mishearings, "button" and "Hudson", still count as a wake, just in case.</span></dd>
         <dt>If it fails</dt><dd>Say it again, closer to the mic. "Watson, Watson" counts as one wake.</dd>
       </dl>
     </div>
@@ -138,7 +142,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, build me a one-page website about Manila street food."</span></dd>
         <dt>Expect</dt><dd>"On it. I'll let you know when it's done." The job goes to our task MCP server on the Pi, which runs the pi.dev agent in a sandbox folder.</dd>
-        <dt>Tell class</dt><dd>The agent can only write inside its sandbox folder. Watson stays free while it works.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">The agent can only write inside its sandbox folder. Watson stays free while it works.</span><span class="v">The agent can write only inside its sandbox folder, and Watson stays free to talk while it works.</span><span class="v">While the agent works, Watson is still free, and the agent can't write anywhere outside its sandbox folder.</span></dd>
         <dt>If it fails</dt><dd>If Watson asks what the site is about, answer in one sentence. If it says it can't reach the agent, run the restart line from the checklist.</dd>
       </dl>
     </div>
@@ -148,7 +152,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, who won the 2026 NBA finals?"</span></dd>
         <dt>Expect</dt><dd>Watson searches the web and says the answer. Nothing opens on screen.</dd>
-        <dt>Tell class</dt><dd>When the model doesn't know, it looks it up instead of guessing. The big task is still running.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">When the model doesn't know, it looks it up instead of guessing. The big task is still running.</span><span class="v">If the model doesn't know something, it searches instead of guessing. Meanwhile the big task keeps running.</span><span class="v">Rather than guess, it looks things up when it doesn't know. The website job is still running in the background.</span></dd>
         <dt>If it fails</dt><dd>Wait 7 s before repeating. Replies can take 4 to 7 s to start.</dd>
       </dl>
     </div>
@@ -158,7 +162,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, turn the living room lights off."</span></dd>
         <dt>Expect</dt><dd>"Done, lights are off." The state changes in the virtual home and on the dashboard.</dd>
-        <dt>Tell class</dt><dd>Even "Watson ... lights off" with a pause works. The sentence right after the wake word counts as addressed.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">Even "Watson ... lights off" with a pause works. The sentence right after the wake word counts as addressed.</span><span class="v">A pause works too, "Watson ... lights off": the sentence right after the wake word counts as addressed.</span><span class="v">You can pause after "Watson" and say "lights off" next; the sentence right after the wake word counts as addressed.</span></dd>
         <dt>If it fails</dt><dd>Repeat as one breath: <span class="voice">"Watson, lights off."</span></dd>
       </dl>
     </div>
@@ -167,7 +171,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <div class="step-head"><b>3b. The big task finishes</b><span class="pill ok">verified on the Pi Nov 6</span></div>
       <dl class="grid3">
         <dt>Expect</dt><dd>At the next quiet moment: "Done! The Manila street food website is ready — take a look." The page opens on the Mac by itself.</dd>
-        <dt>Tell class</dt><dd>It waits until nobody is talking, and it never reads out a file path.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">It waits until nobody is talking, and it never reads out a file path.</span><span class="v">It waits for a quiet moment, and it never reads a file path aloud.</span><span class="v">It only speaks up when nobody is talking, and it never says a file path out loud.</span></dd>
         <dt>If it fails</dt><dd>Keep talking; the announcement stays queued and plays at the next pause.</dd>
       </dl>
     </div>
@@ -177,7 +181,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Say</dt><dd><span class="voice">"Watson, tell me about the history of the Eiffel Tower."</span> Wait until it is a sentence in, then say <span class="voice">"Stop."</span></dd>
         <dt>Expect</dt><dd>It goes quiet and waits.</dd>
-        <dt>Tell class</dt><dd>It did not stop for its own voice, which reaches the mic at the same level as mine. It stopped for my voice saying a stop word: "stop", "wait" or "Watson".</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">It did not stop for its own voice, which reaches the mic at the same level as mine. It stopped for my voice saying a stop word: "stop", "wait" or "Watson".</span><span class="v">Its own voice reaches the mic as loudly as mine, and it didn't stop for that. It stopped because my voice said a stop word: "stop", "wait" or "Watson".</span><span class="v">It ignores its own voice, even though that is as loud at the mic as mine. What stops it is my voice saying "stop", "wait" or "Watson".</span></dd>
         <dt>If it fails</dt><dd>Say <span class="voice">"Stop"</span> once more, louder. Don't repeat it rapidly.</dd>
       </dl>
     </div>
@@ -187,7 +191,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
       <dl class="grid3">
         <dt>Do</dt><dd>Ask a classmate to say something without the wake word, then <span class="voice">"Watson, what time is it?"</span> Then you speak again without "Watson".</dd>
         <dt>Expect</dt><dd>The first sentence is ignored. After "Watson", Watson answers the classmate, and now ignores you. Say <span class="voice">"Watson"</span> to take it back.</dd>
-        <dt>Tell class</dt><dd>Watson listens to one person at a time: whoever called it last. The TV or side talk can't take over, and Watson's own voice saying its name can't either.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">Watson listens to one person at a time: whoever called it last. The TV or side talk can't take over, and Watson's own voice saying its name can't either.</span><span class="v">Watson follows one person at a time, whoever said its name last. The TV and side talk can't take over, and neither can Watson saying its own name.</span><span class="v">Whoever called Watson last is the one it listens to. Side talk or the TV can't take over the session, and Watson's own voice saying its name can't either.</span></dd>
         <dt>If it fails</dt><dd>The classmate's "Watson, …" needs about a second of speech so Watson can learn the voice. Ask them to say a full sentence.</dd>
       </dl>
     </div>
@@ -195,7 +199,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     <div class="step">
       <div class="step-head"><b>6. Idle (tell, don't wait)</b><span class="pill ok">verified live Nov 6</span></div>
       <dl class="grid3">
-        <dt>Tell class</dt><dd>After 5 minutes with no activity, Watson goes idle and answers only speech that starts with its name. That stops it from joining in when we talk among ourselves.</dd>
+        <dt>Tell class</dt><dd class="rot"><span class="v">After 5 minutes with no activity, Watson goes idle and answers only speech that starts with its name. That stops it from joining in when we talk among ourselves.</span><span class="v">After 5 quiet minutes, Watson goes idle and only answers speech that starts with its name, so it doesn't join in when we talk among ourselves.</span><span class="v">If nothing happens for 5 minutes, it goes idle and needs its name again. That keeps it out of our own conversations.</span></dd>
       </dl>
     </div>
 
@@ -219,29 +223,46 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
     </tbody>
   </table>
   </div>
-  <div class="say">
-    <p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds. Even the slow turns now start within four seconds.</p>
+  <div class="say rot">
+    <div class="v"><p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds. Even the slow turns now start within four seconds.</p></div>
+    <div class="v"><p>From the moment you stop talking, Watson starts answering in about two and a half seconds; yesterday it was five. Two changes: my voice now streams to the speech recognizer while I talk, so the transcript is ready a quarter of a second after I stop, and Watson's voice plays as it streams in rather than after the whole sentence. If it needs a tool, it says "One sec." straight away. Most of the remaining wait is the language model's first word, about two seconds, and even slow turns start within four seconds.</p></div>
+    <div class="v"><p>Response time is now about two and a half seconds after you stop talking, half of yesterday's five. We stream my voice to the recognizer while I am still speaking, so the words are ready a quarter of a second after I finish, and we play Watson's voice as it arrives instead of waiting for the full sentence. Tool requests get an immediate "One sec." What remains is mostly the language model's first word, about two seconds; even the slow turns start within four.</p></div>
   </div>
 </section>
 
 <section>
   <h2><span class="t">5:15 · 30 s</span> What's left</h2>
-  <div class="say">
-    <p>Three honest limits. The language model still takes about two seconds to start, and sometimes three. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p>
+  <div class="say rot">
+    <div class="v"><p>Three honest limits. The language model still takes about two seconds to start, and sometimes three. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p></div>
+    <div class="v"><p>Three limits, honestly. The language model needs about two seconds to start, sometimes three. "Stop" can take up to two seconds, because Watson checks the voice before it stops. And echo cancellation didn't work on this hardware, so everything depends on telling voices apart, which is why Watson's voice was chosen to sound unlike mine.</p></div>
+    <div class="v"><p>What it can't do yet, three things. The language model is still about two seconds to its first word, sometimes three. "Stop" takes up to two seconds, since we confirm whose voice it is first. And because echo cancellation failed on this hardware, we rely entirely on telling voices apart; that's why Watson's voice is deliberately different from mine.</p></div>
   </div>
 </section>
 
 <section>
   <h2><span class="t">5:45 · 15 s</span> Close</h2>
-  <div class="say">
-    <p>Watson listens while it talks, knows who it is listening to, and understands its name in my accent. Thank you. Happy to take questions, or you can try to make it talk to you.</p>
+  <div class="say rot">
+    <div class="v"><p>Watson listens while it talks, knows who it is listening to, and understands its name in my accent. Thank you. Happy to take questions, or you can try to make it talk to you.</p></div>
+    <div class="v"><p>So: Watson listens while it talks, knows whose voice to follow, and understands its name in my accent. Thank you. I'm happy to take questions, or come and try to get it to talk to you.</p></div>
+    <div class="v"><p>To sum up, Watson keeps listening while it speaks, knows who it's listening to, and gets its name right in my accent. Thank you. Questions are welcome, or you can try talking to it yourself.</p></div>
   </div>
 </section>
 
 <footer>
-  Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_10-10-53); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 1 of 2 on the Nov 7 bench, and not tried live with the room speaker.
+  Wording changes on every refresh; the facts and numbers stay the same. Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_10-10-53); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 1 of 2 on the Nov 7 bench, and not tried live with the room speaker.
 </footer>
 
 </main>
+<script>
+/* New wording on every refresh: each .rot block shows one of its
+   equivalent phrasings at random. The facts are the same in all of them. */
+document.querySelectorAll(".rot").forEach(function (blk) {
+  var vs = Array.prototype.filter.call(blk.children, function (c) { return c.classList.contains("v"); });
+  var k = Math.floor(Math.random() * vs.length);
+  vs.forEach(function (v, i) {
+    v.style.display = i === k ? (v.tagName === "SPAN" ? "inline" : "block") : "none";
+  });
+});
+</script>
 </body>
 </html>
