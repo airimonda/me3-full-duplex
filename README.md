@@ -105,7 +105,7 @@ gate trade-off: [RESULTS.md](RESULTS.md) and [docs/paper.md](docs/paper.md).
 | `tasks_mcp.py`, `mcp_client.py` | task MCP server (pi.dev in bwrap) and the agent's client |
 | `speakerid.py` | voice enrollment and similarity |
 | `home.py` | music + virtual smart-home state |
-| `ui_server.py`, `mac_show.py` | Watson UI on the Pi; Mac viewer that opens finished tasks |
+| `ui_server.py`, `ui/index.html`, `mac_show.py` | Watson UI on the Pi (:8301); Mac viewer that opens finished tasks |
 | `server.py` | fallback Whisper + Kokoro server on the Mac (:8300) |
 | `bench_entry.py`, `fdbench_marks.py` | fdbench entry point and stage marks |
 | `run_live.sh`, `run_bench_pi.sh`, `run_tasks_mcp.sh`, `run_ui.sh` | Pi launchers |

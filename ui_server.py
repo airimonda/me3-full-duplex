@@ -178,7 +178,10 @@ def _log_offset():
 
 @app.get("/")
 async def index(request=None):
-    return FileResponse(os.path.join(UI_DIR, "index.html"))
+    # Watson's page is versioned in this repo (ui/index.html, Nov 7: Deepgram,
+    # glm-5.3-flash, pi.dev labels); vcm-me2's copy is the fallback
+    own = os.path.join(ME3, "ui", "index.html")
+    return FileResponse(own if os.path.exists(own) else os.path.join(UI_DIR, "index.html"))
 
 
 def tasks_scan():
