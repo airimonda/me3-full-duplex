@@ -96,6 +96,32 @@ def test_barge_stashes_unplayed_audio():
     assert np.array_equal(both, full[:len(both)])
 
 
+def test_waits_for_ack_before_speaking():
+    """Tool turns: the reply must not interleave with the ack phrase."""
+    class Frame:
+        def __init__(self, audio):
+            self.audio = audio
+
+    async def run():
+        a = FakeAgent()
+
+        async def ack():
+            for _ in range(4):
+                await a.push_frame(Frame(np.full(1200, 9, dtype=np.int16).tobytes()))
+                await asyncio.sleep(0.03)
+
+        t = asyncio.create_task(ack())
+        out = pa._SpeechOut(a, 1, after=t)
+        out.say("sentence 1")
+        await out.finish()
+        return a
+
+    s = _samples(asyncio.run(run()).pushed)
+    first_reply = int(np.argmax(s == 1))
+    assert first_reply == 4 * 1200
+    assert (s[:first_reply] == 9).all() and (s[first_reply:] == 1).all()
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
