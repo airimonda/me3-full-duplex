@@ -212,30 +212,30 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
   <table>
     <thead><tr><th>Measure</th><th>Result</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">2.6 s median</td><td>fdbench on the Pi, Nov 7 (target 4.0 s; Nov 6 was 4.9 s)</td></tr>
-      <tr><td>Speech recognition (Deepgram, streamed)</td><td class="n">0.24 s</td><td>fdbench on the Pi, median (target 0.8 s; was 0.93 s)</td></tr>
-      <tr><td>Language model's first word</td><td class="n">1.99 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
-      <tr><td>Voice (Deepgram, streamed) to first audio</td><td class="n">0.29 s</td><td>fdbench on the Pi, median (target 0.6 s; was 1.60 s)</td></tr>
-      <tr><td>Word error rate</td><td class="n">0.12</td><td>fdbench, 30 timed phrases (target 0.15)</td></tr>
-      <tr><td>Stops talking when interrupted</td><td class="n">0.75 / 0.76 s</td><td>Full-Duplex-Bench stop time, 2 trials; judge 5.0 / 5</td></tr>
-      <tr><td>Answered speech not meant for it</td><td class="n">0 / 4</td><td>Full-Duplex-Bench, Nov 7 (side talk, TV, noise, background)</td></tr>
-      <tr><td>Pi under load</td><td class="n">peak 73 °C</td><td>never throttled, no fan</td></tr>
+      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">2.57 s median</td><td>fdbench on the Pi, Nov 7 (target 4.0 s; Nov 6 was 4.9 s)</td></tr>
+      <tr><td>Speech recognition (Deepgram, streamed)</td><td class="n">0.28 s</td><td>fdbench on the Pi, median (target 0.8 s; was 0.93 s)</td></tr>
+      <tr><td>Language model's first word</td><td class="n">2.02 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
+      <tr><td>Voice (Deepgram, streamed) to first audio</td><td class="n">0.30 s</td><td>fdbench on the Pi, median (target 0.6 s; was 1.60 s)</td></tr>
+      <tr><td>Word error rate</td><td class="n">0.11</td><td>fdbench, 30 timed phrases (target 0.15)</td></tr>
+      <tr><td>Stops talking when interrupted</td><td class="n">0.77 / 0.79 s</td><td>Full-Duplex-Bench stop time (mean / p95), 3 trials; 3 / 3 handled, judge 5.0 / 5</td></tr>
+      <tr><td>Answered speech not meant for it</td><td class="n">2 / 6</td><td>Full-Duplex-Bench, Nov 7 (both side talk; TV, noise and background 0)</td></tr>
+      <tr><td>Pi under load</td><td class="n">peak 74 °C</td><td>never throttled, no fan</td></tr>
     </tbody>
   </table>
   </div>
   <div class="say rot">
-    <div class="v"><p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds. Even the slow turns now start within four seconds.</p></div>
-    <div class="v"><p>From the moment you stop talking, Watson starts answering in about two and a half seconds; yesterday it was five. Two changes: my voice now streams to the speech recognizer while I talk, so the transcript is ready a quarter of a second after I stop, and Watson's voice plays as it streams in rather than after the whole sentence. If it needs a tool, it says "One sec." straight away. Most of the remaining wait is the language model's first word, about two seconds, and even slow turns start within four seconds.</p></div>
-    <div class="v"><p>Response time is now about two and a half seconds after you stop talking, half of yesterday's five. We stream my voice to the recognizer while I am still speaking, so the words are ready a quarter of a second after I finish, and we play Watson's voice as it arrives instead of waiting for the full sentence. Tool requests get an immediate "One sec." What remains is mostly the language model's first word, about two seconds; even the slow turns start within four.</p></div>
+    <div class="v"><p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds. A few slow turns still take up to six seconds.</p></div>
+    <div class="v"><p>From the moment you stop talking, Watson starts answering in about two and a half seconds; yesterday it was five. Two changes: my voice now streams to the speech recognizer while I talk, so the transcript is ready a quarter of a second after I stop, and Watson's voice plays as it streams in rather than after the whole sentence. If it needs a tool, it says "One sec." straight away. Most of the remaining wait is the language model's first word, about two seconds, and a few slow turns still take up to six seconds.</p></div>
+    <div class="v"><p>Response time is now about two and a half seconds after you stop talking, half of yesterday's five. We stream my voice to the recognizer while I am still speaking, so the words are ready a quarter of a second after I finish, and we play Watson's voice as it arrives instead of waiting for the full sentence. Tool requests get an immediate "One sec." What remains is mostly the language model's first word, about two seconds; a few slow turns still take up to six.</p></div>
   </div>
 </section>
 
 <section>
   <h2><span class="t">5:15 · 30 s</span> What's left</h2>
   <div class="say rot">
-    <div class="v"><p>Three honest limits. The language model still takes about two seconds to start, and sometimes three. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p></div>
-    <div class="v"><p>Three limits, honestly. The language model needs about two seconds to start, sometimes three. "Stop" can take up to two seconds, because Watson checks the voice before it stops. And echo cancellation didn't work on this hardware, so everything depends on telling voices apart, which is why Watson's voice was chosen to sound unlike mine.</p></div>
-    <div class="v"><p>What it can't do yet, three things. The language model is still about two seconds to its first word, sometimes three. "Stop" takes up to two seconds, since we confirm whose voice it is first. And because echo cancellation failed on this hardware, we rely entirely on telling voices apart; that's why Watson's voice is deliberately different from mine.</p></div>
+    <div class="v"><p>Three honest limits. The language model still takes about two seconds to start, and sometimes close to five. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p></div>
+    <div class="v"><p>Three limits, honestly. The language model needs about two seconds to start, sometimes close to five. "Stop" can take up to two seconds, because Watson checks the voice before it stops. And echo cancellation didn't work on this hardware, so everything depends on telling voices apart, which is why Watson's voice was chosen to sound unlike mine.</p></div>
+    <div class="v"><p>What it can't do yet, three things. The language model is still about two seconds to its first word, sometimes close to five. "Stop" takes up to two seconds, since we confirm whose voice it is first. And because echo cancellation failed on this hardware, we rely entirely on telling voices apart; that's why Watson's voice is deliberately different from mine.</p></div>
   </div>
 </section>
 
@@ -249,7 +249,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 </section>
 
 <footer>
-  Wording changes on every refresh; the facts and numbers stay the same. Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_10-10-53); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 1 of 2 on the Nov 7 bench, and not tried live with the room speaker.
+  Wording changes on every refresh; the facts and numbers stay the same. Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_11-22-33, 3 rounds); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 2 of 3 on the Nov 7 bench, and not tried live with the room speaker.
 </footer>
 
 </main>
