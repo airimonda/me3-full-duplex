@@ -1447,7 +1447,12 @@ class WatsonAgent(FrameProcessor):
             self.spoken_tokens |= _token_set(text)
             mark("tts_request")
             url, hdr, body = _dg_speak_request(text)
-            r = await self.http.post(url, headers=hdr, json=body)
+            try:
+                r = await self.http.post(url, headers=hdr, json=body)
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
+                # server-closed keep-alive socket (live announce crash, Nov 7)
+                self.log_event("tts_retry", err=repr(e)[:120])
+                r = await self.http.post(url, headers=hdr, json=body)
             if r.status_code != 200:
                 self.log_event("tts_error", backend="deepgram", status=r.status_code,
                                body=r.text[:120])
