@@ -897,6 +897,8 @@ class WatsonAgent(FrameProcessor):
         if TOOL_ACK and not self.ack_pcm and ME3_TTS == "deepgram":
             self.ack_pcm[None] = b""   # warming marker: fill once, in the background
             asyncio.create_task(self._warm_acks())
+        if ME3_TTS == "deepgram" and TTS_STREAM:
+            asyncio.create_task(self._dg_warm())
         # volume gate: TV/radio clips sit far below live speech level
         peak = float(np.max(np.abs(np.frombuffer(utt_pcm, dtype=np.int16)))) / 32768.0
         # bench only: in mic mode the voice-ID gate rejects TV/strangers, and
@@ -1460,20 +1462,44 @@ class WatsonAgent(FrameProcessor):
         self.spoken_tokens |= _token_set(text)
         mark("tts_request")
         url, hdr, body = _dg_speak_request(text, raw=True)
+        first = True
+        for attempt in (1, 2):
+            try:
+                async for piece in self._dg_tts_stream(url, hdr, body):
+                    if first:
+                        mark("tts_first_audio")
+                        first = False
+                    yield piece
+                return
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
+                # a pooled keep-alive connection the server already closed:
+                # retry once on a fresh one, unless audio already went out
+                if not first or attempt == 2:
+                    raise
+                self.log_event("tts_retry", err=repr(e)[:120])
+
+    async def _dg_tts_stream(self, url, hdr, body):
         async with self.http.stream("POST", url, headers=hdr, json=body) as r:
             if r.status_code != 200:
                 err = (await r.aread())[:120]
                 self.log_event("tts_error", backend="deepgram", status=r.status_code,
                                body=err.decode("utf-8", "replace"))
                 return
-            first = True
             async for piece in r.aiter_bytes():
-                if not piece:
-                    continue
-                if first:
-                    mark("tts_first_audio")
-                    first = False
-                yield piece
+                if piece:
+                    yield piece
+
+    async def _dg_warm(self):
+        """Endpoint reached: touch api.deepgram.com so the pooled HTTPS
+        connection is open when the first TTS request goes out. With ASR on
+        the websocket nothing else uses that connection between turns, and
+        the first sentence paid a fresh TLS handshake (~0.45 s on the Pi,
+        bench 2026-11-07_08-02-07) or hit a server-closed socket."""
+        try:
+            await self.http.get(f"{DG_URL}/projects", headers={
+                "Authorization": f"Token {_env_key('DEEPGRAM_API_KEY')}"})
+        except Exception:
+            pass
 
     async def _play(self, wav: bytes, gen: int):
         await self._play_pcm(_wav_pcm(wav), gen)
