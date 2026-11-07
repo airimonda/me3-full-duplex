@@ -157,11 +157,7 @@ def submit_task(restatement):
     else:
         agent_model = os.environ.get("ME3_AGENT_MODEL", "z-ai/glm-5.3-flash")
         prompt_text = open(prompt_path).read().strip()
-        # low thinking, like the talker (owner request, Nov 7): glm-5.3-flash
-        # always reasons; pi.dev's --thinking sets the level ("" = pi default)
-        thinking = os.environ.get("ME3_AGENT_THINKING", "low").strip()
         cmd = [_which("pi"), "-p", "--provider", "openrouter", "--model", agent_model,
-               *(["--thinking", thinking] if thinking else []),
                "--no-session", "--", prompt_text]
     cmd = _sandboxed(cmd, tdir)
     env = dict(os.environ)
