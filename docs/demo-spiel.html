@@ -208,26 +208,26 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
   <table>
     <thead><tr><th>Measure</th><th>Result</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">4.9 s median</td><td>fdbench on the Pi, 3 runs, Nov 6 (target 4.0 s)</td></tr>
-      <tr><td>Speech recognition (Deepgram)</td><td class="n">0.93 s</td><td>fdbench on the Pi, median (target 0.8 s)</td></tr>
-      <tr><td>Language model's first word</td><td class="n">2.05 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
-      <tr><td>Voice (Deepgram) to first audio</td><td class="n">1.60 s</td><td>fdbench on the Pi, median (target 0.6 s)</td></tr>
-      <tr><td>Word error rate</td><td class="n">0.14</td><td>fdbench, 30 phrases × 3 runs (target 0.15)</td></tr>
-      <tr><td>Stops talking when interrupted</td><td class="n">0.28 / 0.76 s</td><td>Full-Duplex-Bench stop time, 2 trials</td></tr>
-      <tr><td>Answered speech not meant for it</td><td class="n">5 / 12</td><td>Full-Duplex-Bench, 3 runs pooled</td></tr>
+      <tr><td>Time until Watson starts speaking (E2E)</td><td class="n">2.4 s median</td><td>fdbench on the Pi, Nov 7 (target 4.0 s; Nov 6 was 4.9 s)</td></tr>
+      <tr><td>Speech recognition (Deepgram, streamed)</td><td class="n">0.24 s</td><td>fdbench on the Pi, median (target 0.8 s; was 0.93 s)</td></tr>
+      <tr><td>Language model's first word</td><td class="n">1.99 s</td><td>fdbench on the Pi, median (target 1.5 s)</td></tr>
+      <tr><td>Voice (Deepgram, streamed) to first audio</td><td class="n">0.27 s</td><td>fdbench on the Pi, median (target 0.6 s; was 1.60 s)</td></tr>
+      <tr><td>Word error rate</td><td class="n">0.11</td><td>fdbench, 30 timed phrases (target 0.15)</td></tr>
+      <tr><td>Stops talking when interrupted</td><td class="n">0.56 / 0.71 s</td><td>Full-Duplex-Bench stop time, 2 trials; judge 5.0 / 5</td></tr>
+      <tr><td>Answered speech not meant for it</td><td class="n">1 / 4</td><td>Full-Duplex-Bench, Nov 7 (side talk; TV, noise, background 0)</td></tr>
       <tr><td>Pi under load</td><td class="n">peak 72 °C</td><td>never throttled, no fan</td></tr>
     </tbody>
   </table>
   </div>
   <div class="say">
-    <p>About five seconds from when you stop talking to when Watson starts. The language model's first word is the biggest piece, and the cloud voice adds about a second and a half. Streaming the voice audio instead of waiting for the whole sentence is the next fix.</p>
+    <p>About two and a half seconds from when you stop talking to when Watson starts, down from five yesterday. Two changes did it: Watson now sends my voice to the speech recognizer while I am still talking, so the words are ready a quarter of a second after I stop, and it plays its own voice as the audio streams in instead of waiting for the whole sentence. When it needs a tool, it says "One sec." right away. What is left is mostly the language model's first word, about two seconds.</p>
   </div>
 </section>
 
 <section>
   <h2><span class="t">5:15 · 30 s</span> What's left</h2>
   <div class="say">
-    <p>Three honest limits. Replies start slowly because of the language model. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p>
+    <p>Three honest limits. The language model still takes about two seconds to start, and sometimes five. "Stop" takes up to two seconds, because we confirm the voice before stopping. And echo cancellation on this hardware didn't work, so everything rests on telling voices apart. That's why Watson speaks in a voice deliberately unlike mine.</p>
   </div>
 </section>
 
@@ -239,7 +239,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--ru
 </section>
 
 <footer>
-  Facts on this page come from the Nov 6 Pi logs, today's measurements and Full-Duplex-Bench baseline #0 (fd-benchmark/runs/me3/2026-11-05_13-00-36). Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 1 of 2 on the bench, and not re-verified on the Pi.
+  Facts on this page come from the Nov 6 Pi logs and the Nov 7 fdbench run on the Pi (fd-benchmark/runs/me3/2026-11-07_09-30-20); "was" numbers are the Nov 6 Pi runs. Run 16 and earlier are retired and not quoted. Backchannel resume ("yeah" while it talks) is left out of the live demo: 2 of 2 on the Nov 7 bench, but not tried live with the room speaker.
 </footer>
 
 </main>
