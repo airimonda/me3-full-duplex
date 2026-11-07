@@ -31,8 +31,13 @@ from starlette.staticfiles import StaticFiles
 # http://<pi>:8301. Conversation comes from the live voice loop's log
 # (pipecat_assistant.py); the legacy chat_log.jsonl is the fallback.
 _LIVE_LOG = os.path.join(ME3, "runs", "live", "watson_log.jsonl")
+# The live log is chosen whenever its folder exists, even if the file does
+# not exist yet: a log rotated away while the UI restarted made the UI fall
+# back to chat_log.jsonl for good (Nov 7: UI stopped updating). Watson
+# recreates the file with its next event.
 LOG_PATH = os.environ.get("ME3_UI_LOG") or (
-    _LIVE_LOG if os.path.exists(_LIVE_LOG) else os.path.join(ME3, "chat_log.jsonl"))
+    _LIVE_LOG if os.path.isdir(os.path.dirname(_LIVE_LOG))
+    else os.path.join(ME3, "chat_log.jsonl"))
 SHOW_LOG = os.path.expanduser(os.environ.get("ME3_SHOW_LOG", "~/me3/runs/live/show.jsonl"))
 HOME_STATE = os.path.expanduser("~/sandbox/home_state.json")
 UI_DIR = os.path.join(ME3, "vcm-me2", "runtime", "ui")
@@ -312,6 +317,8 @@ async def ws_dashboard(ws: WebSocket):
         while True:
             await asyncio.sleep(1.0)
             new_offset = _log_offset()
+            if new_offset < offset:
+                offset = 0   # log was rotated: read the new file from the start
             if new_offset > offset:
                 try:
                     with open(LOG_PATH, errors="replace") as f:
