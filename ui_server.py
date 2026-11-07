@@ -57,11 +57,7 @@ def _music_now():
         st = None
     if st is not None or home._ON_MAC or not home.spotify_configured():
         return st
-    p = (_home_state() or {}).get("player") or {}
-    track = p.get("query") or "-"
-    name, _, artist = track.partition(" - ")
-    return {"state": p.get("state", "stopped"), "track": name, "artist": artist or "-",
-            "volume": p.get("volume")}
+    return home.spotify_status_pi()   # the Pi's Spotify Connect device
 
 
 def _spotify_connected():
