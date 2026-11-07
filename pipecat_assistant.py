@@ -589,7 +589,17 @@ class WatsonAgent(FrameProcessor):
         # keep it, or a short backchannel ("uh-huh yeah", <1 s) reaches ASR
         # as only its silent tail (ignored_quiet peak 0.0) and resume never fires
         self.buf = self.probe_pcm
-        self._live_open(bytes(self.probe_pcm))
+        # live ASR gets _PREROLL_MS of mic audio from before the probe too
+        # (play_mic holds the mic during playback): the probe starts ~0.1-0.3 s
+        # into the onset, and streaming lost first words that REST recovered
+        # ("When is the next full moon?" -> "Is the next...", bench 08-59-00)
+        # Bench only: in mic mode the audio before the probe is Watson's own
+        # echo (the keyword path discards even the probe for that reason).
+        want = len(self.probe_pcm) + _PREROLL_BYTES
+        if self.mode == "bench" and self.probe_pcm and len(self.play_mic) >= len(self.probe_pcm):
+            self._live_open(bytes(self.play_mic[-want:]))
+        else:
+            self._live_open(bytes(self.probe_pcm))
         self.speech_ms = self.probe_ms
         self.probe_pcm = bytearray()
         self.gen += 1
