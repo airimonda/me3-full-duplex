@@ -56,7 +56,10 @@ On the Pi (`ssh watsonpi`), each script restarts its process if it exits:
 setsid nohup bash ~/me3/run_live.sh      >/dev/null 2>&1 </dev/null &   # Watson on mic + speaker
 setsid nohup bash ~/me3/run_tasks_mcp.sh >/dev/null 2>&1 </dev/null &   # task MCP + pi.dev agent
 setsid nohup bash ~/me3/run_ui.sh        >/dev/null 2>&1 </dev/null &   # Watson UI on :8301
+setsid nohup bash ~/me3/run_spotify.sh   >/dev/null 2>&1 </dev/null &   # Spotify Connect "Watson" (Premium)
 ```
+
+Spotify, one time: `bash ~/me3/setup_spotify_pi.sh install`, then `... pair` and approve the spotify.com/pair link.
 
 On the Mac, open finished tasks as they land: `./venv/bin/python mac_show.py --pi http://<pi-ip>:8301`.
 

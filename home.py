@@ -7,13 +7,19 @@ otherwise a virtual player in the sandbox.
 
 Spotify creds (any of these locations):
   SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN
-  in ~/.hermes/.env or the environment.
+  in the environment, ~/.hermes/.env or ~/me3/.env (the Pi).
+
+Playback: on the Mac, the Spotify desktop app via AppleScript. On the Pi,
+Spotify Connect: librespot (run_spotify.sh) is the device "Watson" on the
+Pi speaker, and play/pause/next/prev/volume go through the Web API to that
+device (Premium account). If the device is missing, the tool says so.
 """
 import base64
 import json
 import os
 import re
 import subprocess
+import sys
 import time
 import urllib.parse
 
@@ -27,13 +33,109 @@ def _env_key(name):
     v = os.environ.get(name)
     if v:
         return v
-    envpath = os.path.expanduser("~/.hermes/.env")
-    if os.path.exists(envpath):
-        for line in open(envpath):
-            line = line.strip()
-            if line.startswith(name + "="):
-                return line.split("=", 1)[1].strip().strip('"')
+    for envpath in (os.path.expanduser("~/.hermes/.env"), os.path.expanduser("~/me3/.env")):
+        if os.path.exists(envpath):
+            for line in open(envpath):
+                line = line.strip()
+                if line.startswith(name + "="):
+                    return line.split("=", 1)[1].strip().strip('"')
     return None
+
+
+def spotify_configured():
+    """True when the keys for search + playback control are present."""
+    return bool(_env_key("SPOTIFY_CLIENT_ID") and _env_key("SPOTIFY_REFRESH_TOKEN"))
+
+
+# On the Pi: Spotify Connect device "Watson" (librespot, run_spotify.sh)
+_ON_MAC = sys.platform == "darwin"
+SPOTIFY_DEVICE = os.environ.get("ME3_SPOTIFY_DEVICE", "Watson")
+_NO_PI = "Spotify isn't connected on the Pi right now"
+_dev_cache = {"id": None, "t": 0.0}
+
+
+def _pi_device():
+    """(device_id, headers) of the Pi's Connect device; id None if missing.
+    Cached 60 s (a device id is stable while librespot runs)."""
+    h = _sp_headers()
+    if not h:
+        return None, None
+    if _dev_cache["id"] and time.time() - _dev_cache["t"] < 60:
+        return _dev_cache["id"], h
+    r = httpx.get(f"{SPOTIFY_API}/me/player/devices", headers=h, timeout=10)
+    devs = r.json().get("devices", []) if r.status_code == 200 else []
+    dev = next((d.get("id") for d in devs
+                if (d.get("name") or "").lower() == SPOTIFY_DEVICE.lower()), None)
+    _dev_cache.update(id=dev, t=time.time())
+    return dev, h
+
+
+def _pi_call(method, path, json_body=None, retry_s=0.0, **params):
+    """Web API player call on the Pi's device. Returns (ok, error text).
+    retry_s: keep retrying 403 "Restriction violated" / 404 / 5xx that long;
+    right after a hand-over or a fresh librespot start Spotify answers those
+    for a few seconds (vcm-me2 finding)."""
+    dev, h = _pi_device()
+    if not dev:
+        _dev_cache["id"] = None
+        dev, h = _pi_device()      # look it up once more, bypassing the cache
+        if not dev:
+            return False, _NO_PI
+    deadline = time.time() + retry_s
+    while True:
+        r = httpx.request(method, f"{SPOTIFY_API}/me/player/{path}",
+                          params={"device_id": dev, **params}, json=json_body,
+                          headers=h, timeout=10)
+        if r.status_code in (200, 202, 204):
+            _status_cache["t"] = 0.0   # refresh the UI's view right away
+            return True, ""
+        if r.status_code in (403, 404, 500, 502, 503) and time.time() < deadline:
+            time.sleep(1.0)
+            continue
+        _dev_cache["id"] = None        # device may have gone; look it up again next time
+        return False, f"Spotify answered {r.status_code}"
+
+
+def _liked_songs_uri():
+    """The user's Liked Songs as a playable context (vcm-me2 default)."""
+    h = _sp_headers()
+    r = httpx.get(f"{SPOTIFY_API}/me", headers=h, timeout=10) if h else None
+    uid = r.json().get("id") if r is not None and r.status_code == 200 else None
+    return f"spotify:user:{uid}:collection" if uid else None
+
+
+_status_cache = {"v": None, "t": 0.0}
+
+
+def spotify_status_pi():
+    """Playback on the Pi's device for the UI, cached 5 s (the UI polls every
+    second): {'state','track','artist','volume'} or None."""
+    if time.time() - _status_cache["t"] < 5:
+        return _status_cache["v"]
+    v = None
+    h = _sp_headers()
+    if h:
+        try:
+            r = httpx.get(f"{SPOTIFY_API}/me/player", headers=h, timeout=5)
+            if r.status_code == 200 and r.content:
+                d = r.json()
+                dev = d.get("device") or {}
+                if (dev.get("name") or "").lower() == SPOTIFY_DEVICE.lower():
+                    it = d.get("item") or {}
+                    v = {"state": "playing" if d.get("is_playing") else "paused",
+                         "track": it.get("name", "-"),
+                         "artist": ((it.get("artists") or [{}])[0]).get("name", "-"),
+                         "volume": dev.get("volume_percent")}
+        except Exception:
+            v = None
+    _status_cache.update(v=v, t=time.time())
+    return v
+
+
+def _player(**kw):
+    st = _load_state()
+    st.setdefault("player", {}).update(kw)
+    _save_state(st)
 
 
 def _load_state():
@@ -92,9 +194,21 @@ def spotify_search(query, kind="track"):
     if not h:
         return None
     r = httpx.get(f"{SPOTIFY_API}/search",
-                  params={"q": query, "type": kind, "limit": 1}, headers=h, timeout=15)
-    items = r.json().get(f"{kind}s", {}).get("items", [])
-    return items[0] if items else None
+                  params={"q": query, "type": kind, "limit": 10}, headers=h, timeout=15)
+    items = [i for i in r.json().get(f"{kind}s", {}).get("items", []) if i]
+    if not items:
+        return None
+    # Spotify's own top hit is often unrelated ("Love Story Taylor Swift" ->
+    # Katy Perry, Nov 7): pick the hit whose title + artist share the most
+    # words with the request; ties keep Spotify's order.
+    def words(t):
+        return set(re.findall(r"[a-z0-9]+", (t or "").lower())) - {"by", "the", "a", "song", "play"}
+    want = words(query)
+
+    def score(it):
+        names = [it.get("name", "")] + [a.get("name", "") for a in it.get("artists") or []]
+        return len(want & words(" ".join(names)))
+    return max(items, key=lambda it: (score(it), -items.index(it)))
 
 
 def spotify_status():
@@ -142,8 +256,33 @@ def _virtual_note(query):
     _save_state(st)
 
 
+_GENERIC_MUSIC = {"", "music", "some music", "a song", "something", "anything", "spotify"}
+
+
 def spotify_play(query):
+    if not _ON_MAC and (query or "").strip().lower() in _GENERIC_MUSIC:
+        # "play music": the user's Liked Songs on shuffle (vcm-me2 default)
+        ctx = _liked_songs_uri()
+        ok, err = _pi_call("PUT", "play", json_body={"context_uri": ctx} if ctx else None,
+                           retry_s=6.0)
+        if ok:
+            _pi_call("PUT", "shuffle", state="true")   # after play: a fresh device rejects it before
+            _player(state="playing", query="Liked Songs", since=time.time())
+            return "Playing your Liked Songs on Spotify."
+        return f"I couldn't play music: {err}."
     item = spotify_search(query)
+    if not _ON_MAC:
+        if item:
+            name = item.get("name", query)
+            artist = (item.get("artists") or [{}])[0].get("name", "")
+            ok, err = _pi_call("PUT", "play", json_body={"uris": [item.get("uri")]}, retry_s=6.0)
+            if ok:
+                _player(state="playing", query=f"{name} - {artist}" if artist else name,
+                        since=time.time())
+                return f"Playing {name} by {artist} on Spotify."
+            return f"I found {name} by {artist}, but couldn't play it: {err}."
+        ok, err = _pi_call("PUT", "play", retry_s=6.0)   # nothing found: resume
+        return "Playing music on Spotify." if ok else f"I couldn't play music: {err}."
     if not item:
         # no API search (no creds at all) — still try direct AppleScript play
         ok, err = _as(f'tell application "Spotify" to play')
@@ -163,6 +302,11 @@ def spotify_play(query):
 
 
 def spotify_pause():
+    if not _ON_MAC:
+        ok, err = _pi_call("PUT", "pause")
+        if ok:
+            _player(state="paused")
+        return "Paused." if ok else f"I couldn't pause: {err}."
     ok, _ = _as('tell application "Spotify" to pause')
     if ok:
         return "Paused."
@@ -173,17 +317,28 @@ def spotify_pause():
 
 
 def spotify_next():
+    if not _ON_MAC:
+        ok, err = _pi_call("POST", "next")
+        return "Skipped to the next track." if ok else f"I couldn't skip: {err}."
     ok, _ = _as('tell application "Spotify" to next track')
     return "Skipped to the next track." if ok else "Skip failed — is Spotify open?"
 
 
 def spotify_prev():
+    if not _ON_MAC:
+        ok, err = _pi_call("POST", "previous")
+        return "Previous track." if ok else f"I couldn't go back: {err}."
     ok, _ = _as('tell application "Spotify" to previous track')
     return "Previous track." if ok else "Skip-back failed — is Spotify open?"
 
 
 def spotify_volume(pct):
     pct = max(0, min(100, int(pct)))
+    if not _ON_MAC:
+        ok, err = _pi_call("PUT", "volume", volume_percent=pct)
+        if ok:
+            _player(volume=pct)
+        return f"Volume set to {pct}%." if ok else f"I couldn't change the volume: {err}."
     ok, _ = _as(f'tell application "Spotify" to set sound volume to {pct}')
     if ok:
         return f"Volume set to {pct}%."

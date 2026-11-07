@@ -348,6 +348,11 @@ _ENDPOINT_MS = 600
 _MIN_UTT_MS = 250
 _PREROLL_MS = int(os.environ.get("ME3_PREROLL_MS", "400"))   # audio kept before VAD onset
 _PREROLL_BYTES = _IN_SR * 2 * _PREROLL_MS // 1000
+# Music ducking (mic mode, Pi): Spotify plays through librespot on the same
+# speaker; while Watson speaks or was just addressed its stream drops to
+# this volume so Watson is audible and the mic can still hear the owner.
+_MUSIC_DUCK = float(os.environ.get("ME3_MUSIC_DUCK", "0.25"))
+_DUCK_HOLD_S = 8.0
 _ANSWER_WINDOW_S = 10.0   # after Watson asks a question, short replies count
 _BARGE_MS = 150
 _SPEAK_THRESH = 0.5
@@ -449,6 +454,8 @@ class WatsonAgent(FrameProcessor):
         self.respond_task = None   # in-flight _respond coroutine (for supersede)
         self.asr_live = None       # _DGLive session of the utterance in progress
         self.asr_spare = None      # pre-connected _DGLive for the next onset
+        self.duck_until = 0.0      # music stays ducked until then (monotonic)
+        self.ducker = None
         self.ack_pcm = {}          # tool-ack phrase -> PCM (filled on first use)
         self.ack_i = 0
         self.key = _openrouter_key()
@@ -614,6 +621,8 @@ class WatsonAgent(FrameProcessor):
     # ---- audio path ------------------------------------------------------
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
+        if self.ducker is None and self.mode == "mic" and sys.platform != "darwin":
+            self.ducker = asyncio.create_task(self._music_ducker())
         from pipecat.frames.frames import InputAudioRawFrame
         from pipecat.processors.frame_processor import FrameDirection
         if isinstance(frame, InputAudioRawFrame):
@@ -1136,6 +1145,7 @@ class WatsonAgent(FrameProcessor):
             _SpeechOut that synthesizes and plays them while the LLM keeps
             streaming; the pass returns once everything said has played."""
             nonlocal first_audio
+            self.duck_until = time.monotonic() + _DUCK_HOLD_S   # addressed: duck music
             out = _SpeechOut(self, gen, after=after) if TTS_STREAM else None
             if out is None and after is not None:
                 await after   # old path: let the ack finish before speaking
@@ -1383,6 +1393,45 @@ class WatsonAgent(FrameProcessor):
         if first:
             live.feed(first)
         self.asr_spare = _DGLive(self)   # ready for the next utterance
+
+    async def _music_ducker(self):
+        """Lower librespot's PipeWire stream while Watson speaks or for
+        _DUCK_HOLD_S after an addressed turn; restore it afterwards. Local
+        (pw-dump + wpctl), so it acts within ~0.3 s."""
+        applied = {}
+        last_want, last_scan = 1.0, 0.0
+        while True:
+            await asyncio.sleep(0.3)
+            want = _MUSIC_DUCK if (self.playing or time.monotonic() < self.duck_until) else 1.0
+            now = time.monotonic()
+            # scan PipeWire only on a change, or every 3 s while ducked (a
+            # stream that starts mid-duck); pw-dump is too heavy for 0.3 s
+            if want == last_want and not (want < 1.0 and now - last_scan > 3.0):
+                continue
+            last_want, last_scan = want, now
+            try:
+                p = await asyncio.create_subprocess_exec(
+                    "pw-dump", stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL)
+                out, _ = await p.communicate()
+                ids = [o["id"] for o in json.loads(out or b"[]")
+                       if "librespot" in " ".join(str(v) for k, v in
+                                                  ((o.get("info") or {}).get("props") or {}).items()
+                                                  if k in ("application.name",
+                                                           "application.process.binary",
+                                                           "node.name")).lower()
+                       and ((o.get("info") or {}).get("props") or {}).get(
+                           "media.class", "").startswith("Stream/Output")]
+                for i in ids:
+                    if applied.get(i) != want:
+                        q = await asyncio.create_subprocess_exec("wpctl", "set-volume", str(i), str(want))
+                        await q.wait()
+                        applied[i] = want
+                        self.log_event("music_duck", node=i, volume=want)
+                applied = {i: v for i, v in applied.items() if i in ids}
+            except Exception as e:
+                self.log_event("music_duck_error", err=repr(e)[:120])
+                await asyncio.sleep(5)
 
     def _live_view(self, you=None, watson=None, phase=None):
         """Mic mode: the in-progress turn for the Watson UI's live transcript

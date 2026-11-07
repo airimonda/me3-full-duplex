@@ -31,8 +31,13 @@ from starlette.staticfiles import StaticFiles
 # http://<pi>:8301. Conversation comes from the live voice loop's log
 # (pipecat_assistant.py); the legacy chat_log.jsonl is the fallback.
 _LIVE_LOG = os.path.join(ME3, "runs", "live", "watson_log.jsonl")
+# The live log is chosen whenever its folder exists, even if the file does
+# not exist yet: a log rotated away while the UI restarted made the UI fall
+# back to chat_log.jsonl for good (Nov 7: UI stopped updating). Watson
+# recreates the file with its next event.
 LOG_PATH = os.environ.get("ME3_UI_LOG") or (
-    _LIVE_LOG if os.path.exists(_LIVE_LOG) else os.path.join(ME3, "chat_log.jsonl"))
+    _LIVE_LOG if os.path.isdir(os.path.dirname(_LIVE_LOG))
+    else os.path.join(ME3, "chat_log.jsonl"))
 SHOW_LOG = os.path.expanduser(os.environ.get("ME3_SHOW_LOG", "~/me3/runs/live/show.jsonl"))
 HOME_STATE = os.path.expanduser("~/sandbox/home_state.json")
 UI_DIR = os.path.join(ME3, "vcm-me2", "runtime", "ui")
@@ -41,12 +46,23 @@ SANDBOX = os.path.expanduser("~/sandbox")
 app = FastAPI()
 
 
-def _spotify_connected():
-    p = os.path.expanduser("~/.hermes/.env")
+def _music_now():
+    """What the music chip and player show. On the Mac: the Spotify app's
+    own status. On the Pi there is no app: report the player state the music
+    tool keeps (commands are played on the Mac by mac_show.py), when the
+    Spotify keys are present."""
     try:
-        return "SPOTIFY_REFRESH_TOKEN" in open(p).read()
-    except OSError:
-        return False
+        st = home.spotify_status() if home._ON_MAC else None
+    except Exception:
+        st = None
+    if st is not None or home._ON_MAC or not home.spotify_configured():
+        return st
+    return home.spotify_status_pi()   # the Pi's Spotify Connect device
+
+
+def _spotify_connected():
+    # same key lookup as the music tool (env, ~/.hermes/.env, ~/me3/.env)
+    return home.spotify_configured()
 
 
 def _home_state():
@@ -236,10 +252,7 @@ async def api_state():
     msgs = []
     for _, e in log_entries():
         msgs.extend(entries_to_messages(e))
-    try:
-        music_real = home.spotify_status()
-    except Exception:
-        music_real = None
+    music_real = _music_now()
     return JSONResponse({"messages": msgs, "state": dashboard_state(),
                          "tasks": tasks_scan(), "home": _home_state(),
                          "music": music_real})
@@ -260,10 +273,7 @@ async def api_tool(req: dict):
         out = home.do_tool(name, args)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    try:
-        music_real = home.spotify_status()
-    except Exception:
-        music_real = None
+    music_real = _music_now()
     return JSONResponse({"ok": True, "reply": out, "state": dashboard_state(),
                          "home": _home_state(), "music": music_real})
 
@@ -312,6 +322,8 @@ async def ws_dashboard(ws: WebSocket):
         while True:
             await asyncio.sleep(1.0)
             new_offset = _log_offset()
+            if new_offset < offset:
+                offset = 0   # log was rotated: read the new file from the start
             if new_offset > offset:
                 try:
                     with open(LOG_PATH, errors="replace") as f:
