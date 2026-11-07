@@ -1,0 +1,8729 @@
+{
+  "deck_summary": {
+    "title": "Full-Duplex Voice Agent on a Raspberry Pi",
+    "student": "me3",
+    "run_id": "2026-11-07_10-10-53",
+    "date": "2026-11-07",
+    "method": {
+      "phrases": 10,
+      "runs": 3,
+      "turns": 30,
+      "bullets": [
+        "One clock: the assistant machine's monotonic clock; every stage timestamped (VAD end → ASR final → LLM 1st token → TTS 1st audio → speaker)",
+        "E2E = speaker − VAD end; barge-in = stop − speech start",
+        "10 phrases × 3 runs; mean + p95; JSON log per run: stage_latency.json (per turn: trials/<id>/stages.jsonl)"
+      ]
+    },
+    "targets": {
+      "e2e": 4.0,
+      "asr_final": 0.8,
+      "llm_ttft": 1.5,
+      "tts_ttfb": 0.6,
+      "barge_in": 0.8,
+      "wer": 0.15
+    },
+    "table": [
+      {
+        "key": "e2e",
+        "metric": "E2E latency",
+        "definition": "end of speech → audio out",
+        "target": 4.0,
+        "mean": 2.66669,
+        "p95": 3.9254949999999993,
+        "median": 2.5567,
+        "n": 30,
+        "unit": "s",
+        "status": "met",
+        "note": null
+      },
+      {
+        "key": "asr_final",
+        "metric": "ASR final",
+        "definition": "end of speech → transcript",
+        "target": 0.8,
+        "mean": 0.25833666666666666,
+        "p95": 0.30019999999999997,
+        "median": 0.24185,
+        "n": 30,
+        "unit": "s",
+        "status": "met",
+        "note": null
+      },
+      {
+        "key": "llm_ttft",
+        "metric": "LLM TTFT",
+        "definition": "transcript → first token",
+        "target": 1.5,
+        "mean": 2.1121133333333333,
+        "p95": 3.2637949999999996,
+        "median": 1.98875,
+        "n": 30,
+        "unit": "s",
+        "status": "over",
+        "note": null
+      },
+      {
+        "key": "tts_ttfb",
+        "metric": "TTS TTFB",
+        "definition": "text → first audio chunk",
+        "target": 0.6,
+        "mean": 0.30762222222222224,
+        "p95": 0.4011549999999996,
+        "median": 0.28825,
+        "n": 18,
+        "unit": "s",
+        "status": "met",
+        "note": null
+      },
+      {
+        "key": "barge_in",
+        "metric": "Barge-in",
+        "definition": "speech → playback stopped",
+        "target": 0.8,
+        "mean": 0.7319999999999993,
+        "p95": 0.7607999999999994,
+        "median": 0.7319999999999993,
+        "n": 3,
+        "unit": "s",
+        "status": "met",
+        "note": null
+      },
+      {
+        "key": "wer",
+        "metric": "WER",
+        "definition": "ASR accuracy on test set",
+        "target": 0.15,
+        "mean": 0.12121212121212122,
+        "p95": null,
+        "median": null,
+        "n": 30,
+        "unit": "ratio",
+        "status": "met",
+        "note": null
+      }
+    ],
+    "chart": {
+      "segments": [
+        {
+          "key": "asr_final",
+          "label": "ASR",
+          "mean": 0.25833666666666666
+        },
+        {
+          "key": "llm_ttft",
+          "label": "LLM",
+          "mean": 2.1121133333333333
+        },
+        {
+          "key": "tts_ttfb",
+          "label": "TTS",
+          "mean": 0.30762222222222224
+        }
+      ],
+      "e2e_mean": 2.66669,
+      "e2e_p95": 3.9254949999999993,
+      "target": 4.0
+    },
+    "run_card": {
+      "device": "Raspberry Pi 4 Model B Rev 1.1 · 4 GB",
+      "cooling": "not stated · peak 73 °C · throttled never",
+      "network": "cloud: Wi-Fi · benchmark link: Wi-Fi, 5 ms round trip",
+      "date": "2026-11-07",
+      "models": {
+        "harness": "pipecat 1.15.0",
+        "ASR": "Deepgram nova-3 (cloud)",
+        "LLM": "z-ai/glm-5.3-flash (OpenRouter); fallback openai/gpt-4o-mini",
+        "TTS": "Deepgram aura-2-jupiter-en (cloud)",
+        "VAD": "Silero VAD (Pipecat SileroVADAnalyzer)",
+        "Harness": "Pipecat custom FrameProcessor (WatsonAgent)"
+      }
+    },
+    "context": {
+      "n": 84,
+      "source": [
+        "estimate",
+        "usage"
+      ],
+      "tokens_median": 1669.5,
+      "tokens_max": 1994,
+      "tokens_first": 1442,
+      "tokens_last": 1712,
+      "messages_median": 12.0,
+      "messages_max": 15,
+      "messages_first": 2,
+      "messages_last": 13,
+      "per_run_median_tokens": {
+        "1": 1670.0,
+        "2": 1662.0,
+        "3": 1668.5
+      }
+    }
+  },
+  "session": {
+    "student": "me3",
+    "run_id": "2026-11-07_10-10-53",
+    "started": "2026-11-07T10:10:53+08:00",
+    "rounds": 2,
+    "seed": 922546,
+    "fdbench": "0.1.0",
+    "rig": "direct",
+    "judge": "openrouter/openai/gpt-4o",
+    "machine": {
+      "os": "Darwin 27.2.0",
+      "machine": "arm64",
+      "pi_model": null,
+      "ram_gb": 16.0,
+      "python": "3.11.16",
+      "network": "unknown",
+      "pi_temp_c": null,
+      "pi_throttled": null,
+      "disk_free_gb": 75.7,
+      "hostname": "Ailenes-MacBook-Air.local",
+      "optional": {
+        "ASR (faster-whisper)": true,
+        "pitch/intensity (praat-parselmouth)": true,
+        "UTMOSv2 quality": false
+      },
+      "fdbench": "0.1.0"
+    },
+    "devices": {},
+    "warnings_overridden": [],
+    "dataset": "/Users/ailenemondares/me3/fd-benchmark/datasets",
+    "dataset_counts": {
+      "v1_pause_synth": 30,
+      "v1_pause_candor": 30,
+      "v1_turntaking": 30,
+      "v1_interrupt": 30,
+      "v15_interruption": 30,
+      "v15_backchannel": 30,
+      "v15_talking_to_other": 30,
+      "v15_background": 30,
+      "false_tt": 40,
+      "stage_latency": 150
+    },
+    "stage_test": {
+      "phrases": 10,
+      "runs": 3,
+      "phrases_dir": null
+    },
+    "targets": {
+      "e2e": 4.0,
+      "asr_final": 0.8,
+      "llm_ttft": 1.5,
+      "tts_ttfb": 0.6,
+      "barge_in": 0.8,
+      "wer": 0.15
+    },
+    "where": "remote",
+    "link": {
+      "peer": "192.168.1.80:56624",
+      "rtt_ms": 5.1459169771987945,
+      "host": "0.0.0.0",
+      "port": 8791,
+      "disconnects": 1
+    },
+    "machine_stats": {
+      "hello": {
+        "host": "watsonpi",
+        "os": "Linux 6.18.50+rpt-rpi-v8",
+        "machine": "aarch64",
+        "pi_model": "Raspberry Pi 4 Model B Rev 1.1",
+        "ncpu": 4,
+        "caps": {
+          "backend": "procfs",
+          "cpu": true,
+          "cores": true,
+          "memory": true,
+          "processes": true,
+          "temperature": true,
+          "clock": true,
+          "throttle": true
+        },
+        "slow_every": 2.0,
+        "patterns": {
+          "asr_mcp": "mcp_servers.asr",
+          "tts_mcp": "mcp_servers.tts",
+          "tools_mcp": "mcp_servers.tools"
+        },
+        "python": "3.13.5",
+        "ram_mb": 3796,
+        "network": "wifi",
+        "link_network": "wifi",
+        "source": "remote"
+      },
+      "samples": 1186,
+      "clock_offset": 119950.203868199
+    },
+    "marks": {
+      "stages_seen": {
+        "vad_end": 74,
+        "asr_final": 68,
+        "llm_request": 85,
+        "llm_first_token": 65,
+        "tts_request": 199,
+        "tts_first_audio": 198,
+        "audio_out": 76,
+        "llm_usage": 71,
+        "tool_start": 16,
+        "tool_end": 16,
+        "interrupted": 39
+      },
+      "n": 907,
+      "clock_offsets": {
+        "ws": 119950.20290776298
+      }
+    },
+    "models": {
+      "harness": "pipecat 1.15.0",
+      "ASR": "Deepgram nova-3 (cloud)",
+      "LLM": "z-ai/glm-5.3-flash (OpenRouter); fallback openai/gpt-4o-mini",
+      "TTS": "Deepgram aura-2-jupiter-en (cloud)",
+      "VAD": "Silero VAD (Pipecat SileroVADAnalyzer)",
+      "Harness": "Pipecat custom FrameProcessor (WatsonAgent)"
+    },
+    "finished": "2026-11-07T10:30:40+08:00",
+    "outcome": {
+      "completed": 50,
+      "total": 50,
+      "stopped_early": false,
+      "seconds": 1180.2616230830026
+    }
+  },
+  "preflight": {
+    "checks": [
+      {
+        "ok": true,
+        "text": "Python 3.11.16",
+        "fix": "Python 3.10 or newer is needed"
+      },
+      {
+        "ok": true,
+        "text": "packages: core ok",
+        "fix": "pip install -r requirements.txt"
+      },
+      {
+        "ok": true,
+        "text": "scoring extras: ASR (faster-whisper), pitch/intensity (praat-parselmouth) · not installed: UTMOSv2 quality",
+        "fix": "pip install -r requirements-score.txt (laptop) to score transcripts and voice change"
+      },
+      {
+        "ok": true,
+        "text": "Darwin 27.2.0 (arm64) · 16.0 GB RAM · 75.7 GB free",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "network: unknown",
+        "fix": "use Ethernet if you can; Wi-Fi jitter widens latencies"
+      },
+      {
+        "ok": true,
+        "text": "datasets: 430 clips in 10 groups",
+        "fix": "python tools/fetch_datasets.py --force gets the full set"
+      },
+      {
+        "ok": true,
+        "text": "dataset checksums ok (sampled)",
+        "fix": "rebuild the datasets"
+      },
+      {
+        "ok": true,
+        "text": "rig: direct feed on ws://127.0.0.1:8791 (no audio devices used)",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "assistant runs on another machine (Pi); fdbench will listen on all interfaces",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "Pi CPU, memory, temperature and throttling: sent by the launcher during the run (checked when she connects; see the run log)",
+        "fix": ""
+      },
+      {
+        "ok": true,
+        "text": "judge: openrouter/openai/gpt-4o · reachable (OK)",
+        "fix": "check the API key / URL in .env"
+      }
+    ],
+    "info": {
+      "os": "Darwin 27.2.0",
+      "machine": "arm64",
+      "pi_model": null,
+      "ram_gb": 16.0,
+      "python": "3.11.16",
+      "network": "unknown",
+      "pi_temp_c": null,
+      "pi_throttled": null,
+      "disk_free_gb": 75.7,
+      "hostname": "Ailenes-MacBook-Air.local",
+      "optional": {
+        "ASR (faster-whisper)": true,
+        "pitch/intensity (praat-parselmouth)": true,
+        "UTMOSv2 quality": false
+      },
+      "fdbench": "0.1.0"
+    },
+    "devices": {}
+  },
+  "queue_summary": {
+    "rounds": 2,
+    "seed": 922546,
+    "total": 50,
+    "done": 50,
+    "skipped": 0,
+    "failed": 0
+  },
+  "fdbench": "0.1.0",
+  "scored_at": "2026-11-07T10:32:14+08:00",
+  "trials": 58,
+  "per_group": {
+    "v1_pause_synth": 2,
+    "v1_pause_candor": 2,
+    "v1_turntaking": 2,
+    "v1_interrupt": 2,
+    "false_tt": 4,
+    "v15_interruption": 2,
+    "v15_backchannel": 2,
+    "v15_talking_to_other": 2,
+    "v15_background": 2,
+    "stage_latency": 30
+  },
+  "notes": [],
+  "judge": "openrouter/openai/gpt-4o",
+  "asr": "faster-whisper/small",
+  "metrics": {
+    "v1_pause_synth.tor": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v1_pause_candor.tor": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v1_turntaking.tor": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v1_turntaking.missed_rate": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v1_turntaking.latency": {
+      "n": 1,
+      "median": 4.642000000000063,
+      "p95": 4.642000000000063,
+      "mean": 4.642000000000063,
+      "min": 4.642000000000063,
+      "max": 4.642000000000063,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "false_tt.rate": {
+      "n": 4,
+      "k": 0,
+      "value": 0.0
+    },
+    "false_tt.rate.side_talk": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0
+    },
+    "false_tt.rate.tv_radio": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0
+    },
+    "false_tt.rate.background": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0
+    },
+    "false_tt.rate.noise": {
+      "n": 1,
+      "k": 0,
+      "value": 0.0
+    },
+    "v1_interrupt.tor": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v1_interrupt.latency": {
+      "n": 2,
+      "median": 3.4983125,
+      "p95": 3.9071937499999994,
+      "mean": 3.4983125,
+      "min": 3.0440000000000005,
+      "max": 3.9526249999999994,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v1_interrupt.rating": {
+      "n": 2,
+      "mean": 5.0
+    },
+    "v1_interrupt.t_stop": {
+      "n": 1,
+      "median": 0.6999999999999993,
+      "p95": 0.6999999999999993,
+      "mean": 0.6999999999999993,
+      "min": 0.6999999999999993,
+      "max": 0.6999999999999993,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v1_interrupt.not_played": 0,
+    "v15_interruption.respond": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_interruption.resume": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_interruption.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_interruption.unknown": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_interruption.class.through": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_interruption.class.paused": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_interruption.class.stopped": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_interruption.t_stop": {
+      "n": 2,
+      "median": 0.7479999999999993,
+      "p95": 0.7623999999999993,
+      "mean": 0.7479999999999993,
+      "min": 0.7319999999999993,
+      "max": 0.7639999999999993,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_interruption.t_resp": {
+      "n": 2,
+      "median": 3.2200000000000006,
+      "p95": 3.522400000000001,
+      "mean": 3.2200000000000006,
+      "min": 2.8840000000000003,
+      "max": 3.556000000000001,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_interruption.judged": 2,
+    "v15_interruption.n": 2,
+    "v15_backchannel.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_backchannel.resume": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v15_backchannel.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_backchannel.unknown": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v15_backchannel.class.through": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_backchannel.class.paused": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_backchannel.class.stopped": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_backchannel.t_stop": {
+      "n": 0,
+      "median": null,
+      "p95": null,
+      "mean": null,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": null
+    },
+    "v15_backchannel.t_resp": {
+      "n": 1,
+      "median": 0.7989999999999995,
+      "p95": 0.7989999999999995,
+      "mean": 0.7989999999999995,
+      "min": 0.7989999999999995,
+      "max": 0.7989999999999995,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_backchannel.judged": 2,
+    "v15_backchannel.n": 2,
+    "v15_talking_to_other.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_talking_to_other.resume": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_talking_to_other.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_talking_to_other.unknown": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_talking_to_other.class.through": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_talking_to_other.class.paused": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_talking_to_other.class.stopped": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_talking_to_other.t_stop": {
+      "n": 2,
+      "median": 0.7479999999999998,
+      "p95": 0.7624000000000002,
+      "mean": 0.7479999999999998,
+      "min": 0.7319999999999993,
+      "max": 0.7640000000000002,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_talking_to_other.t_resp": {
+      "n": 2,
+      "median": 4.34,
+      "p95": 5.506399999999999,
+      "mean": 4.34,
+      "min": 3.0440000000000005,
+      "max": 5.635999999999999,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_talking_to_other.judged": 2,
+    "v15_talking_to_other.n": 2,
+    "v15_background.respond": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_background.resume": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v15_background.uncertain": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_background.unknown": {
+      "n": 2,
+      "k": 1,
+      "value": 0.5
+    },
+    "v15_background.class.through": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_background.class.paused": {
+      "n": 2,
+      "k": 0,
+      "value": 0.0
+    },
+    "v15_background.class.stopped": {
+      "n": 2,
+      "k": 2,
+      "value": 1.0
+    },
+    "v15_background.t_stop": {
+      "n": 1,
+      "median": 0.6360000000000001,
+      "p95": 0.6360000000000001,
+      "mean": 0.6360000000000001,
+      "min": 0.6360000000000001,
+      "max": 0.6360000000000001,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "v15_background.t_resp": {
+      "n": 0,
+      "median": null,
+      "p95": null,
+      "mean": null,
+      "ci95_median": [
+        null,
+        null
+      ],
+      "p95_note": null
+    },
+    "v15_background.judged": 2,
+    "v15_background.n": 2,
+    "voice.basis": "Respond-labelled interruption clips",
+    "voice.wpm": {
+      "n": 2,
+      "mean_delta": -44.45953465343103,
+      "p": 0.11327325508791582,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.pitch_mean": {
+      "n": 2,
+      "mean_delta": 10.83787996489204,
+      "p": 0.7159963543486974,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.pitch_sd": {
+      "n": 2,
+      "mean_delta": 30.553622368259166,
+      "p": 0.6303836131700401,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.intensity_mean": {
+      "n": 2,
+      "mean_delta": -1.8723844335816722,
+      "p": 0.5208310751448864,
+      "significant": false,
+      "expected": "lower"
+    },
+    "voice.intensity_sd": {
+      "n": 2,
+      "mean_delta": 0.008644247051313947,
+      "p": 0.9950193275020027,
+      "significant": false,
+      "expected": "higher"
+    },
+    "voice.utmosv2": {
+      "n": 0,
+      "mean_delta": null,
+      "p": null,
+      "significant": null,
+      "expected": "no drop"
+    },
+    "course.e2e": {
+      "n": 30,
+      "median": 2.5567,
+      "p95": 3.9254949999999993,
+      "mean": 2.66669,
+      "min": 1.3828,
+      "max": 5.992,
+      "ci95_median": [
+        2.185,
+        3.0548
+      ],
+      "p95_note": null,
+      "source": "marks"
+    },
+    "course.asr_final": {
+      "n": 30,
+      "median": 0.24185,
+      "p95": 0.30019999999999997,
+      "mean": 0.25833666666666666,
+      "min": 0.1929,
+      "max": 0.3999,
+      "ci95_median": [
+        0.23795,
+        0.2783
+      ],
+      "p95_note": null
+    },
+    "course.llm_ttft": {
+      "n": 30,
+      "median": 1.98875,
+      "p95": 3.2637949999999996,
+      "mean": 2.1121133333333333,
+      "min": 1.0281,
+      "max": 4.7867,
+      "ci95_median": [
+        1.5936,
+        2.4011
+      ],
+      "p95_note": null
+    },
+    "course.tts_ttfb": {
+      "n": 18,
+      "median": 0.28825,
+      "p95": 0.4011549999999996,
+      "mean": 0.30762222222222224,
+      "min": 0.2624,
+      "max": 0.6457,
+      "ci95_median": [
+        0.27780000000000005,
+        0.29359999999999997
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+    },
+    "course.endpointing": {
+      "n": 30,
+      "median": 0.5564,
+      "p95": 0.5699850000000001,
+      "mean": 0.5532333333333334,
+      "min": 0.5191,
+      "max": 0.5771,
+      "ci95_median": [
+        0.5545,
+        0.55905
+      ],
+      "p95_note": null
+    },
+    "course.e2e_heard": {
+      "n": 30,
+      "median": 3.316,
+      "p95": 4.840799999999999,
+      "mean": 3.4674666666666667,
+      "min": 2.02,
+      "max": 6.596,
+      "ci95_median": [
+        2.868,
+        3.7807999999999993
+      ],
+      "p95_note": null
+    },
+    "course.wer": {
+      "n": 30,
+      "ref_words": 198,
+      "edits": 24,
+      "wer": 0.12121212121212122,
+      "mean_phrase_wer": 0.09523809523809522
+    },
+    "course.barge_in": {
+      "n": 3,
+      "median": 0.7319999999999993,
+      "p95": 0.7607999999999994,
+      "mean": 0.7319999999999993,
+      "min": 0.6999999999999993,
+      "max": 0.7639999999999993,
+      "ci95_median": [
+        0.6999999999999993,
+        0.7639999999999993
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial",
+      "kept_talking": 0
+    },
+    "course.context": {
+      "n": 84,
+      "source": [
+        "estimate",
+        "usage"
+      ],
+      "tokens_median": 1669.5,
+      "tokens_max": 1994,
+      "tokens_first": 1442,
+      "tokens_last": 1712,
+      "messages_median": 12.0,
+      "messages_max": 15,
+      "messages_first": 2,
+      "messages_last": 13,
+      "per_run_median_tokens": {
+        "1": 1670.0,
+        "2": 1662.0,
+        "3": 1668.5
+      }
+    },
+    "course.tool_calls": {
+      "n": 15,
+      "median": 0.0108,
+      "p95": 1.8184699999999998,
+      "mean": 0.3654733333333333,
+      "min": 0.005,
+      "max": 1.894,
+      "ci95_median": [
+        0.0094,
+        0.0175
+      ],
+      "p95_note": "with fewer than 20 trials p95 is close to the slowest trial",
+      "by_name": {
+        "add_reminder": 2,
+        "contact_message": 3,
+        "get_time": 1,
+        "list_items": 2,
+        "set_alarm": 4,
+        "web_search": 3
+      }
+    },
+    "course.stages_seen": {
+      "vad_end": 74,
+      "asr_final": 68,
+      "llm_request": 84,
+      "llm_first_token": 65,
+      "tts_request": 174,
+      "llm_usage": 65,
+      "tts_first_audio": 171,
+      "audio_out": 69,
+      "interrupted": 39,
+      "tool_start": 16,
+      "tool_end": 15
+    },
+    "course.per_run": {
+      "1": {
+        "e2e": {
+          "n": 10,
+          "median": 2.6517,
+          "p95": 3.709134999999999,
+          "mean": 2.62769,
+          "min": 1.4745,
+          "max": 4.0393,
+          "ci95_median": [
+            2.01815,
+            3.1252500000000003
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "asr_final": {
+          "n": 10,
+          "median": 0.236,
+          "p95": 0.298085,
+          "mean": 0.24825,
+          "min": 0.2187,
+          "max": 0.3083,
+          "ci95_median": [
+            0.2266,
+            0.2783
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "llm_ttft": {
+          "n": 10,
+          "median": 2.0892,
+          "p95": 3.1785199999999993,
+          "mean": 2.14133,
+          "min": 1.1705,
+          "max": 3.3425,
+          "ci95_median": [
+            1.5671,
+            2.6896
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "tts_ttfb": {
+          "n": 6,
+          "median": 0.28090000000000004,
+          "p95": 0.293975,
+          "mean": 0.2805,
+          "min": 0.2624,
+          "max": 0.2966,
+          "ci95_median": [
+            0.26925,
+            0.29135
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        }
+      },
+      "2": {
+        "e2e": {
+          "n": 10,
+          "median": 2.3,
+          "p95": 4.730559999999997,
+          "mean": 2.65027,
+          "min": 1.6386,
+          "max": 5.992,
+          "ci95_median": [
+            1.8812,
+            2.9201
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "asr_final": {
+          "n": 10,
+          "median": 0.24425000000000002,
+          "p95": 0.28948999999999997,
+          "mean": 0.25287,
+          "min": 0.1929,
+          "max": 0.2903,
+          "ci95_median": [
+            0.2311,
+            0.2876
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "llm_ttft": {
+          "n": 10,
+          "median": 1.6377,
+          "p95": 3.7726249999999975,
+          "mean": 2.01176,
+          "min": 1.1806,
+          "max": 4.7867,
+          "ci95_median": [
+            1.257,
+            2.35475
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "tts_ttfb": {
+          "n": 6,
+          "median": 0.29125,
+          "p95": 0.55855,
+          "mean": 0.3505666666666667,
+          "min": 0.2878,
+          "max": 0.6457,
+          "ci95_median": [
+            0.28905000000000003,
+            0.47140000000000004
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        }
+      },
+      "3": {
+        "e2e": {
+          "n": 10,
+          "median": 2.81325,
+          "p95": 3.6789849999999995,
+          "mean": 2.72211,
+          "min": 1.3828,
+          "max": 3.7864,
+          "ci95_median": [
+            1.9724,
+            3.5424
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "asr_final": {
+          "n": 10,
+          "median": 0.2701,
+          "p95": 0.3495899999999999,
+          "mean": 0.27388999999999997,
+          "min": 0.2296,
+          "max": 0.3999,
+          "ci95_median": [
+            0.2403,
+            0.2862
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "llm_ttft": {
+          "n": 10,
+          "median": 2.0525,
+          "p95": 3.16499,
+          "mean": 2.18325,
+          "min": 1.0281,
+          "max": 3.1676,
+          "ci95_median": [
+            1.59075125,
+            3.04235
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        },
+        "tts_ttfb": {
+          "n": 6,
+          "median": 0.2824,
+          "p95": 0.3428,
+          "mean": 0.2918,
+          "min": 0.2638,
+          "max": 0.358,
+          "ci95_median": [
+            0.26539999999999997,
+            0.3276
+          ],
+          "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+        }
+      }
+    },
+    "course.phrases": 10,
+    "course.runs": 3,
+    "course.turns": 30
+  },
+  "resources": {
+    "available": true,
+    "hello": {
+      "host": "watsonpi",
+      "os": "Linux 6.18.50+rpt-rpi-v8",
+      "machine": "aarch64",
+      "pi_model": "Raspberry Pi 4 Model B Rev 1.1",
+      "ncpu": 4,
+      "caps": {
+        "backend": "procfs",
+        "cpu": true,
+        "cores": true,
+        "memory": true,
+        "processes": true,
+        "temperature": true,
+        "clock": true,
+        "throttle": true
+      },
+      "slow_every": 2.0,
+      "patterns": {
+        "asr_mcp": "mcp_servers.asr",
+        "tts_mcp": "mcp_servers.tts",
+        "tools_mcp": "mcp_servers.tools"
+      },
+      "python": "3.13.5",
+      "ram_mb": 3796,
+      "network": "wifi",
+      "link_network": "wifi",
+      "source": "remote",
+      "clock_offset": 119950.203868199
+    },
+    "source": "remote",
+    "run": {
+      "n": 1186,
+      "seconds": 1185.0003425210016,
+      "cpu_median": 7.5,
+      "cpu_p95": 14.4,
+      "cpu_max": 37.6,
+      "cpu_mean": 8.25476793248945,
+      "busiest_core_p95": 23.95999999999999,
+      "temp_max": 73.036,
+      "temp_median": 70.601,
+      "mhz_min": 600.0,
+      "mhz_median": 900.0,
+      "mem_avail_min_mb": 2763.5,
+      "swap_used_max_mb": 0.0,
+      "throttle_samples": 1186,
+      "throttled_share": 0.0,
+      "throttled_any": false,
+      "flag_counts": {
+        "under_voltage_now": 0,
+        "freq_capped_now": 0,
+        "throttled_now": 0,
+        "soft_temp_limit_now": 0
+      },
+      "procs": {
+        "assistant": {
+          "label": "Assistant (pipeline + VAD)",
+          "cpu_mean": 5.871848101265822,
+          "cpu_p95": 9.238,
+          "rss_peak_mb": 387.1
+        }
+      }
+    },
+    "new_flags_during_run": [],
+    "start_warnings": [],
+    "probe": {
+      "ms_median": 2.47,
+      "share_of_one_core": 0.01031,
+      "share_of_machine": 0.0025775
+    },
+    "per_group": {
+      "v1_pause_synth": {
+        "n": 46,
+        "seconds": 496.00044897702173,
+        "cpu_median": 7.85,
+        "cpu_p95": 14.125,
+        "cpu_max": 17.5,
+        "cpu_mean": 8.793478260869565,
+        "busiest_core_p95": 25.125,
+        "temp_max": 71.575,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 800.0,
+        "mem_avail_min_mb": 2879.9,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 46,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.603260869565218,
+            "cpu_p95": 9.4625,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "v1_pause_candor": {
+        "n": 47,
+        "seconds": 233.00059737099218,
+        "cpu_median": 7.3,
+        "cpu_p95": 13.619999999999997,
+        "cpu_max": 22.1,
+        "cpu_mean": 8.187234042553191,
+        "busiest_core_p95": 22.34999999999998,
+        "temp_max": 71.575,
+        "temp_median": 70.601,
+        "mhz_min": 600.0,
+        "mhz_median": 800.0,
+        "mem_avail_min_mb": 2879.9,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 47,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.163829787234042,
+            "cpu_p95": 10.098999999999997,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "v1_turntaking": {
+        "n": 40,
+        "seconds": 535.9998810859979,
+        "cpu_median": 7.1,
+        "cpu_p95": 13.894999999999996,
+        "cpu_max": 17.5,
+        "cpu_mean": 7.832499999999999,
+        "busiest_core_p95": 22.35499999999999,
+        "temp_max": 72.062,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 1500.0,
+        "mem_avail_min_mb": 2878.8,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 40,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 5.8942499999999995,
+            "cpu_p95": 9.034999999999998,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "v1_interrupt": {
+        "n": 48,
+        "seconds": 273.0000584459922,
+        "cpu_median": 7.699999999999999,
+        "cpu_p95": 14.814999999999998,
+        "cpu_max": 15.8,
+        "cpu_mean": 8.177083333333334,
+        "busiest_core_p95": 24.144999999999996,
+        "temp_max": 72.549,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 1250.0,
+        "mem_avail_min_mb": 2880.0,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 48,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.406666666666666,
+            "cpu_p95": 9.575,
+            "rss_peak_mb": 386.9
+          }
+        }
+      },
+      "false_tt": {
+        "n": 44,
+        "seconds": 294.99895332500455,
+        "cpu_median": 6.65,
+        "cpu_p95": 12.17,
+        "cpu_max": 13.2,
+        "cpu_mean": 7.159090909090909,
+        "busiest_core_p95": 17.285,
+        "temp_max": 72.062,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 800.0,
+        "mem_avail_min_mb": 2879.7,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 44,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 5.062954545454545,
+            "cpu_p95": 6.7125,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "v15_interruption": {
+        "n": 64,
+        "seconds": 347.9998586449947,
+        "cpu_median": 7.7,
+        "cpu_p95": 14.239999999999998,
+        "cpu_max": 18.0,
+        "cpu_mean": 8.2015625,
+        "busiest_core_p95": 27.349999999999994,
+        "temp_max": 72.062,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 1500.0,
+        "mem_avail_min_mb": 2803.5,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 64,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.0221875,
+            "cpu_p95": 10.349999999999994,
+            "rss_peak_mb": 386.9
+          }
+        }
+      },
+      "v15_backchannel": {
+        "n": 55,
+        "seconds": 215.00093595701037,
+        "cpu_median": 7.3,
+        "cpu_p95": 16.55999999999999,
+        "cpu_max": 37.6,
+        "cpu_mean": 9.129090909090909,
+        "busiest_core_p95": 40.759999999999984,
+        "temp_max": 72.549,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 1500.0,
+        "mem_avail_min_mb": 2763.5,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 55,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 5.908909090909091,
+            "cpu_p95": 8.581,
+            "rss_peak_mb": 386.9
+          }
+        }
+      },
+      "v15_talking_to_other": {
+        "n": 65,
+        "seconds": 359.9990560930164,
+        "cpu_median": 7.9,
+        "cpu_p95": 14.6,
+        "cpu_max": 19.9,
+        "cpu_mean": 8.206153846153846,
+        "busiest_core_p95": 26.139999999999997,
+        "temp_max": 72.062,
+        "temp_median": 70.601,
+        "mhz_min": 700.0,
+        "mhz_median": 800.0,
+        "mem_avail_min_mb": 2878.8,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 65,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.414153846153846,
+            "cpu_p95": 9.649999999999999,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "v15_background": {
+        "n": 59,
+        "seconds": 316.0009951160173,
+        "cpu_median": 7.5,
+        "cpu_p95": 15.8,
+        "cpu_max": 19.1,
+        "cpu_mean": 8.257627118644068,
+        "busiest_core_p95": 27.139999999999993,
+        "temp_max": 71.575,
+        "temp_median": 70.114,
+        "mhz_min": 700.0,
+        "mhz_median": 900.0,
+        "mem_avail_min_mb": 2878.8,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 59,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 6.138474576271186,
+            "cpu_p95": 9.598999999999995,
+            "rss_peak_mb": 387.1
+          }
+        }
+      },
+      "stage_latency": {
+        "n": 369,
+        "seconds": 396.98018327899626,
+        "cpu_median": 8.3,
+        "cpu_p95": 14.919999999999993,
+        "cpu_max": 34.2,
+        "cpu_mean": 8.695663956639565,
+        "busiest_core_p95": 24.67999999999997,
+        "temp_max": 73.036,
+        "temp_median": 71.088,
+        "mhz_min": 700.0,
+        "mhz_median": 1500.0,
+        "mem_avail_min_mb": 2861.4,
+        "swap_used_max_mb": 0.0,
+        "throttle_samples": 369,
+        "throttled_share": 0.0,
+        "throttled_any": false,
+        "flag_counts": {
+          "under_voltage_now": 0,
+          "freq_capped_now": 0,
+          "throttled_now": 0,
+          "soft_temp_limit_now": 0
+        },
+        "procs": {
+          "assistant": {
+            "label": "Assistant (pipeline + VAD)",
+            "cpu_mean": 5.9137669376693776,
+            "cpu_p95": 9.25,
+            "rss_peak_mb": 385.0
+          }
+        }
+      }
+    },
+    "per_trial": [
+      {
+        "trial": "r01_false_tt_false_side_talk_008",
+        "group": "false_tt",
+        "variant": "main",
+        "start": 671.93,
+        "end": 682.13,
+        "n": 11,
+        "cpu_mean": 6.954545454545453,
+        "busiest_core_p95": 15.5,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_false_tt_false_tv_radio_000",
+        "group": "false_tt",
+        "variant": "main",
+        "start": 555.88,
+        "end": 567.54,
+        "n": 12,
+        "cpu_mean": 7.058333333333334,
+        "busiest_core_p95": 15.899999999999999,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_backchannel_11",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 151.69,
+        "end": 161.84,
+        "n": 10,
+        "cpu_mean": 9.440000000000001,
+        "busiest_core_p95": 22.5,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_backchannel_51",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 5.04,
+        "end": 25.37,
+        "n": 20,
+        "cpu_mean": 9.540000000000001,
+        "busiest_core_p95": 26.955,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_backchannel_90",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 92.26,
+        "end": 107.09,
+        "n": 15,
+        "cpu_mean": 9.026666666666667,
+        "busiest_core_p95": 32.19999999999999,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_background_29",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 80.45,
+        "end": 86.19,
+        "n": 6,
+        "cpu_mean": 6.2,
+        "busiest_core_p95": 14.375,
+        "temp_max": 71.088,
+        "mhz_min": 1500.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_background_70",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 167.93,
+        "end": 174.9,
+        "n": 7,
+        "cpu_mean": 9.157142857142857,
+        "busiest_core_p95": 18.089999999999996,
+        "temp_max": 73.036,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_talking_to_other_25",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 61.77,
+        "end": 74.35,
+        "n": 13,
+        "cpu_mean": 8.761538461538462,
+        "busiest_core_p95": 23.879999999999992,
+        "temp_max": 70.601,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_talking_to_other_47",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 48.73,
+        "end": 55.7,
+        "n": 7,
+        "cpu_mean": 6.942857142857143,
+        "busiest_core_p95": 16.54,
+        "temp_max": 70.601,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v15_talking_to_other_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 113.19,
+        "end": 125.07,
+        "n": 12,
+        "cpu_mean": 8.575,
+        "busiest_core_p95": 26.54,
+        "temp_max": 70.601,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v1_interrupt_174",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 131.15,
+        "end": 145.58,
+        "n": 14,
+        "cpu_mean": 9.12857142857143,
+        "busiest_core_p95": 20.35,
+        "temp_max": 72.062,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_stage_latency_phrase_v1_interrupt_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 31.5,
+        "end": 42.64,
+        "n": 11,
+        "cpu_mean": 8.200000000000001,
+        "busiest_core_p95": 21.1,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_backchannel_v15_backchannel_23",
+        "group": "v15_backchannel",
+        "variant": "main",
+        "start": 688.18,
+        "end": 699.12,
+        "n": 11,
+        "cpu_mean": 6.790909090909091,
+        "busiest_core_p95": 27.25,
+        "temp_max": 71.575,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 0.7989999999999995,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_backchannel_v15_backchannel_23_clean",
+        "group": "v15_backchannel",
+        "variant": "clean",
+        "start": 705.2,
+        "end": 719.28,
+        "n": 14,
+        "cpu_mean": 8.921428571428573,
+        "busiest_core_p95": 21.94,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_background_v15_background_21",
+        "group": "v15_background",
+        "variant": "main",
+        "start": 753.38,
+        "end": 769.84,
+        "n": 16,
+        "cpu_mean": 8.44375,
+        "busiest_core_p95": 30.4,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_background_v15_background_21_clean",
+        "group": "v15_background",
+        "variant": "clean",
+        "start": 775.94,
+        "end": 788.85,
+        "n": 13,
+        "cpu_mean": 9.223076923076924,
+        "busiest_core_p95": 27.259999999999998,
+        "temp_max": 71.575,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_interruption_v15_interruption_30",
+        "group": "v15_interruption",
+        "variant": "main",
+        "start": 601.66,
+        "end": 620.24,
+        "n": 19,
+        "cpu_mean": 7.726315789473683,
+        "busiest_core_p95": 28.45999999999998,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 3.556000000000001,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_interruption_v15_interruption_30_clean",
+        "group": "v15_interruption",
+        "variant": "clean",
+        "start": 626.36,
+        "end": 637.45,
+        "n": 11,
+        "cpu_mean": 8.554545454545455,
+        "busiest_core_p95": 27.6,
+        "temp_max": 72.062,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_talking_to_other_v15_talking_to_other_15",
+        "group": "v15_talking_to_other",
+        "variant": "main",
+        "start": 824.13,
+        "end": 840.56,
+        "n": 16,
+        "cpu_mean": 8.09375,
+        "busiest_core_p95": 24.775000000000002,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 3.0440000000000005,
+        "ok": true
+      },
+      {
+        "trial": "r01_v15_talking_to_other_v15_talking_to_other_15_clean",
+        "group": "v15_talking_to_other",
+        "variant": "clean",
+        "start": 846.67,
+        "end": 862.64,
+        "n": 16,
+        "cpu_mean": 8.131250000000001,
+        "busiest_core_p95": 20.924999999999997,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v1_interrupt_v1_interrupt_6",
+        "group": "v1_interrupt",
+        "variant": "main",
+        "start": 725.35,
+        "end": 747.25,
+        "n": 22,
+        "cpu_mean": 8.7,
+        "busiest_core_p95": 28.054999999999996,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 3.0440000000000005,
+        "ok": true
+      },
+      {
+        "trial": "r01_v1_pause_candor_v1_pause_candor_215",
+        "group": "v1_pause_candor",
+        "variant": "main",
+        "start": 794.92,
+        "end": 818.03,
+        "n": 24,
+        "cpu_mean": 8.112499999999999,
+        "busiest_core_p95": 23.02499999999999,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v1_pause_synth_v1_pause_synth_62",
+        "group": "v1_pause_synth",
+        "variant": "main",
+        "start": 643.52,
+        "end": 665.84,
+        "n": 22,
+        "cpu_mean": 9.568181818181818,
+        "busiest_core_p95": 26.945,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r01_v1_turntaking_v1_turntaking_113",
+        "group": "v1_turntaking",
+        "variant": "main",
+        "start": 573.61,
+        "end": 595.57,
+        "n": 22,
+        "cpu_mean": 6.831818181818182,
+        "busiest_core_p95": 16.424999999999997,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": false
+      },
+      {
+        "trial": "r02_false_tt_false_background_009",
+        "group": "false_tt",
+        "variant": "main",
+        "start": 1076.9,
+        "end": 1086.25,
+        "n": 10,
+        "cpu_mean": 8.14,
+        "busiest_core_p95": 19.959999999999994,
+        "temp_max": 70.601,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_false_tt_false_noise_002",
+        "group": "false_tt",
+        "variant": "main",
+        "start": 956.61,
+        "end": 967.7,
+        "n": 11,
+        "cpu_mean": 6.581818181818181,
+        "busiest_core_p95": 17.25,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_backchannel_11",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 295.9,
+        "end": 313.33,
+        "n": 18,
+        "cpu_mean": 7.694444444444445,
+        "busiest_core_p95": 18.81,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_backchannel_51",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 351.27,
+        "end": 368.85,
+        "n": 17,
+        "cpu_mean": 9.9,
+        "busiest_core_p95": 26.619999999999997,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_backchannel_90",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 193.52,
+        "end": 212.85,
+        "n": 19,
+        "cpu_mean": 9.115789473684211,
+        "busiest_core_p95": 18.13,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_background_29",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 180.96,
+        "end": 187.44,
+        "n": 7,
+        "cpu_mean": 9.714285714285714,
+        "busiest_core_p95": 28.749999999999986,
+        "temp_max": 72.549,
+        "mhz_min": 1500.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_background_70",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 337.37,
+        "end": 345.2,
+        "n": 8,
+        "cpu_mean": 5.825,
+        "busiest_core_p95": 17.625,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_talking_to_other_25",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 319.43,
+        "end": 331.28,
+        "n": 12,
+        "cpu_mean": 8.624999999999998,
+        "busiest_core_p95": 20.485,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_talking_to_other_47",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 259.36,
+        "end": 271.92,
+        "n": 12,
+        "cpu_mean": 9.033333333333331,
+        "busiest_core_p95": 22.029999999999998,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v15_talking_to_other_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 240.4,
+        "end": 253.26,
+        "n": 13,
+        "cpu_mean": 12.223076923076924,
+        "busiest_core_p95": 70.11999999999995,
+        "temp_max": 72.549,
+        "mhz_min": 1500.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v1_interrupt_174",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 218.99,
+        "end": 234.29,
+        "n": 16,
+        "cpu_mean": 9.05,
+        "busiest_core_p95": 24.25,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_stage_latency_phrase_v1_interrupt_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 278.01,
+        "end": 289.81,
+        "n": 11,
+        "cpu_mean": 9.418181818181816,
+        "busiest_core_p95": 21.6,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v15_backchannel_v15_backchannel_20",
+        "group": "v15_backchannel",
+        "variant": "main",
+        "start": 868.71,
+        "end": 888.4,
+        "n": 20,
+        "cpu_mean": 11.14,
+        "busiest_core_p95": 95.25,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": false
+      },
+      {
+        "trial": "r02_v15_backchannel_v15_backchannel_20_clean",
+        "group": "v15_backchannel",
+        "variant": "clean",
+        "start": 894.53,
+        "end": 904.85,
+        "n": 10,
+        "cpu_mean": 7.970000000000001,
+        "busiest_core_p95": 18.514999999999997,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": false
+      },
+      {
+        "trial": "r02_v15_background_v15_background_66",
+        "group": "v15_background",
+        "variant": "main",
+        "start": 1034.27,
+        "end": 1053.01,
+        "n": 19,
+        "cpu_mean": 7.310526315789474,
+        "busiest_core_p95": 25.149999999999984,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": false
+      },
+      {
+        "trial": "r02_v15_background_v15_background_66_clean",
+        "group": "v15_background",
+        "variant": "clean",
+        "start": 1059.16,
+        "end": 1070.83,
+        "n": 11,
+        "cpu_mean": 8.481818181818182,
+        "busiest_core_p95": 22.75,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v15_interruption_v15_interruption_55",
+        "group": "v15_interruption",
+        "variant": "main",
+        "start": 910.92,
+        "end": 927.25,
+        "n": 17,
+        "cpu_mean": 8.105882352941178,
+        "busiest_core_p95": 22.66,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 2.8840000000000003,
+        "ok": true
+      },
+      {
+        "trial": "r02_v15_interruption_v15_interruption_55_clean",
+        "group": "v15_interruption",
+        "variant": "clean",
+        "start": 933.37,
+        "end": 950.51,
+        "n": 17,
+        "cpu_mean": 8.6,
+        "busiest_core_p95": 22.06,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v15_talking_to_other_v15_talking_to_other_77",
+        "group": "v15_talking_to_other",
+        "variant": "main",
+        "start": 1146.36,
+        "end": 1163.66,
+        "n": 17,
+        "cpu_mean": 7.523529411764707,
+        "busiest_core_p95": 25.999999999999993,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 5.635999999999999,
+        "ok": true
+      },
+      {
+        "trial": "r02_v15_talking_to_other_v15_talking_to_other_77_clean",
+        "group": "v15_talking_to_other",
+        "variant": "clean",
+        "start": 1169.79,
+        "end": 1185.2,
+        "n": 16,
+        "cpu_mean": 9.11875,
+        "busiest_core_p95": 26.6,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v1_interrupt_v1_interrupt_67",
+        "group": "v1_interrupt",
+        "variant": "main",
+        "start": 973.78,
+        "end": 999.77,
+        "n": 26,
+        "cpu_mean": 7.734615384615385,
+        "busiest_core_p95": 19.0,
+        "temp_max": 72.549,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 3.9526249999999994,
+        "ok": true
+      },
+      {
+        "trial": "r02_v1_pause_candor_v1_pause_candor_189",
+        "group": "v1_pause_candor",
+        "variant": "main",
+        "start": 1005.94,
+        "end": 1028.17,
+        "n": 23,
+        "cpu_mean": 8.265217391304349,
+        "busiest_core_p95": 18.0,
+        "temp_max": 71.088,
+        "mhz_min": 600.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v1_pause_synth_v1_pause_synth_29",
+        "group": "v1_pause_synth",
+        "variant": "main",
+        "start": 1116.97,
+        "end": 1140.25,
+        "n": 24,
+        "cpu_mean": 8.083333333333334,
+        "busiest_core_p95": 22.56999999999999,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r02_v1_turntaking_v1_turntaking_57",
+        "group": "v1_turntaking",
+        "variant": "main",
+        "start": 1092.33,
+        "end": 1110.87,
+        "n": 18,
+        "cpu_mean": 9.055555555555554,
+        "busiest_core_p95": 25.36,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": 4.642000000000063,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_backchannel_11",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 494.91,
+        "end": 509.39,
+        "n": 15,
+        "cpu_mean": 7.786666666666665,
+        "busiest_core_p95": 19.72,
+        "temp_max": 72.062,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_backchannel_51",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 454.92,
+        "end": 471.34,
+        "n": 17,
+        "cpu_mean": 8.594117647058823,
+        "busiest_core_p95": 21.199999999999996,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_backchannel_90",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 477.45,
+        "end": 488.82,
+        "n": 11,
+        "cpu_mean": 7.9363636363636365,
+        "busiest_core_p95": 19.75,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_background_29",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 374.97,
+        "end": 381.65,
+        "n": 7,
+        "cpu_mean": 7.242857142857143,
+        "busiest_core_p95": 15.1,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_background_70",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 387.72,
+        "end": 394.32,
+        "n": 7,
+        "cpu_mean": 8.071428571428571,
+        "busiest_core_p95": 29.369999999999987,
+        "temp_max": 72.062,
+        "mhz_min": 800.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_talking_to_other_25",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 515.5,
+        "end": 524.52,
+        "n": 9,
+        "cpu_mean": 8.855555555555556,
+        "busiest_core_p95": 16.98,
+        "temp_max": 71.088,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_talking_to_other_47",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 417.79,
+        "end": 428.85,
+        "n": 11,
+        "cpu_mean": 7.836363636363635,
+        "busiest_core_p95": 19.0,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v15_talking_to_other_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 434.94,
+        "end": 448.82,
+        "n": 14,
+        "cpu_mean": 7.4071428571428575,
+        "busiest_core_p95": 21.2,
+        "temp_max": 71.575,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v1_interrupt_174",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 400.38,
+        "end": 411.7,
+        "n": 11,
+        "cpu_mean": 9.281818181818181,
+        "busiest_core_p95": 21.9,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      },
+      {
+        "trial": "r03_stage_latency_phrase_v1_interrupt_52",
+        "group": "stage_latency",
+        "variant": "main",
+        "start": 530.6,
+        "end": 549.75,
+        "n": 19,
+        "cpu_mean": 8.447368421052634,
+        "busiest_core_p95": 21.57999999999998,
+        "temp_max": 72.062,
+        "mhz_min": 700.0,
+        "throttled": false,
+        "under_voltage": false,
+        "latency": null,
+        "ok": true
+      }
+    ],
+    "lat_vs_load": {
+      "pairs": [
+        {
+          "trial": "r01_v15_backchannel_v15_backchannel_23",
+          "group": "v15_backchannel",
+          "latency": 0.7989999999999995,
+          "cpu_mean": 6.790909090909091,
+          "temp_max": 71.575,
+          "throttled": false
+        },
+        {
+          "trial": "r01_v15_interruption_v15_interruption_30",
+          "group": "v15_interruption",
+          "latency": 3.556000000000001,
+          "cpu_mean": 7.726315789473683,
+          "temp_max": 71.575,
+          "throttled": false
+        },
+        {
+          "trial": "r01_v15_talking_to_other_v15_talking_to_other_15",
+          "group": "v15_talking_to_other",
+          "latency": 3.0440000000000005,
+          "cpu_mean": 8.09375,
+          "temp_max": 72.062,
+          "throttled": false
+        },
+        {
+          "trial": "r01_v1_interrupt_v1_interrupt_6",
+          "group": "v1_interrupt",
+          "latency": 3.0440000000000005,
+          "cpu_mean": 8.7,
+          "temp_max": 71.575,
+          "throttled": false
+        },
+        {
+          "trial": "r02_v15_interruption_v15_interruption_55",
+          "group": "v15_interruption",
+          "latency": 2.8840000000000003,
+          "cpu_mean": 8.105882352941178,
+          "temp_max": 72.062,
+          "throttled": false
+        },
+        {
+          "trial": "r02_v15_talking_to_other_v15_talking_to_other_77",
+          "group": "v15_talking_to_other",
+          "latency": 5.635999999999999,
+          "cpu_mean": 7.523529411764707,
+          "temp_max": 71.575,
+          "throttled": false
+        },
+        {
+          "trial": "r02_v1_interrupt_v1_interrupt_67",
+          "group": "v1_interrupt",
+          "latency": 3.9526249999999994,
+          "cpu_mean": 7.734615384615385,
+          "temp_max": 72.549,
+          "throttled": false
+        },
+        {
+          "trial": "r02_v1_turntaking_v1_turntaking_57",
+          "group": "v1_turntaking",
+          "latency": 4.642000000000063,
+          "cpu_mean": 9.055555555555554,
+          "temp_max": 71.088,
+          "throttled": false
+        }
+      ],
+      "r_cpu": 0.41178462324888343,
+      "median_latency_throttled": null,
+      "median_latency_not_throttled": 3.3000000000000007
+    },
+    "flagged": [],
+    "timeline": {
+      "labels": [
+        "assistant"
+      ],
+      "points": [
+        {
+          "t": 0.0,
+          "cpu": 5.3,
+          "temp": 69.14,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 2.0,
+          "cpu": 6.7,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 4.0,
+          "cpu": 6.15,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 6.0,
+          "cpu": 7.7,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 8.0,
+          "cpu": 5.0,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 10.0,
+          "cpu": 9.95,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 12.0,
+          "cpu": 10.65,
+          "temp": 69.38,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.12
+          }
+        },
+        {
+          "t": 14.0,
+          "cpu": 16.05,
+          "temp": 70.6,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.38
+          }
+        },
+        {
+          "t": 16.0,
+          "cpu": 7.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 18.0,
+          "cpu": 8.8,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 20.0,
+          "cpu": 8.75,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 22.0,
+          "cpu": 12.55,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 24.0,
+          "cpu": 8.7,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 26.0,
+          "cpu": 9.75,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 28.0,
+          "cpu": 7.0,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 30.0,
+          "cpu": 5.65,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 32.0,
+          "cpu": 10.25,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 34.0,
+          "cpu": 4.35,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 36.0,
+          "cpu": 6.6,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 38.0,
+          "cpu": 8.95,
+          "temp": 69.87,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.74
+          }
+        },
+        {
+          "t": 40.0,
+          "cpu": 11.0,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 42.0,
+          "cpu": 7.3,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 44.0,
+          "cpu": 9.9,
+          "temp": 69.87,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 46.0,
+          "cpu": 6.05,
+          "temp": 70.11,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 48.0,
+          "cpu": 10.3,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 50.0,
+          "cpu": 5.05,
+          "temp": 69.87,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 52.0,
+          "cpu": 6.8,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 54.0,
+          "cpu": 5.95,
+          "temp": 69.63,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 56.0,
+          "cpu": 12.0,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 58.0,
+          "cpu": 10.35,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 60.0,
+          "cpu": 7.5,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 62.0,
+          "cpu": 7.4,
+          "temp": 69.87,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 64.0,
+          "cpu": 3.9,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 66.0,
+          "cpu": 8.3,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 68.0,
+          "cpu": 8.05,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 70.0,
+          "cpu": 11.95,
+          "temp": 70.36,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.87
+          }
+        },
+        {
+          "t": 72.0,
+          "cpu": 11.35,
+          "temp": 69.38,
+          "mhz": 950.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.75
+          }
+        },
+        {
+          "t": 74.0,
+          "cpu": 15.2,
+          "temp": 70.11,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 76.0,
+          "cpu": 6.05,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 78.0,
+          "cpu": 7.65,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 80.0,
+          "cpu": 5.7,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.13
+          }
+        },
+        {
+          "t": 82.0,
+          "cpu": 7.0,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 84.0,
+          "cpu": 5.95,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 86.0,
+          "cpu": 9.15,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 88.0,
+          "cpu": 4.15,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 90.0,
+          "cpu": 5.85,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 92.0,
+          "cpu": 13.05,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.86
+          }
+        },
+        {
+          "t": 94.0,
+          "cpu": 5.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.89
+          }
+        },
+        {
+          "t": 96.0,
+          "cpu": 5.95,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 98.0,
+          "cpu": 7.95,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 100.0,
+          "cpu": 13.7,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.0
+          }
+        },
+        {
+          "t": 102.0,
+          "cpu": 9.9,
+          "temp": 70.11,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 104.0,
+          "cpu": 11.1,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.88
+          }
+        },
+        {
+          "t": 106.0,
+          "cpu": 7.05,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 108.0,
+          "cpu": 9.7,
+          "temp": 69.87,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 110.0,
+          "cpu": 6.2,
+          "temp": 69.63,
+          "mhz": 650.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 112.0,
+          "cpu": 8.65,
+          "temp": 69.14,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 114.0,
+          "cpu": 5.55,
+          "temp": 70.11,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 116.0,
+          "cpu": 5.75,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 118.0,
+          "cpu": 7.55,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 120.0,
+          "cpu": 10.95,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.13
+          }
+        },
+        {
+          "t": 122.0,
+          "cpu": 13.6,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.87
+          }
+        },
+        {
+          "t": 124.0,
+          "cpu": 8.05,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 126.0,
+          "cpu": 9.4,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 128.0,
+          "cpu": 6.7,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 130.0,
+          "cpu": 7.8,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 132.0,
+          "cpu": 6.25,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 134.0,
+          "cpu": 11.3,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 136.0,
+          "cpu": 6.3,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 138.0,
+          "cpu": 12.3,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 140.0,
+          "cpu": 9.4,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 142.0,
+          "cpu": 10.35,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 144.0,
+          "cpu": 8.0,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 146.0,
+          "cpu": 9.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 148.0,
+          "cpu": 5.0,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 150.0,
+          "cpu": 5.7,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 152.02,
+          "cpu": 10.85,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.97
+          }
+        },
+        {
+          "t": 154.0,
+          "cpu": 6.0,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 156.0,
+          "cpu": 9.0,
+          "temp": 71.57,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 158.0,
+          "cpu": 9.6,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 160.0,
+          "cpu": 11.75,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.88
+          }
+        },
+        {
+          "t": 162.0,
+          "cpu": 9.05,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 164.0,
+          "cpu": 11.05,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 166.0,
+          "cpu": 7.6,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 168.0,
+          "cpu": 12.85,
+          "temp": 72.31,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.87
+          }
+        },
+        {
+          "t": 170.0,
+          "cpu": 8.05,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 172.0,
+          "cpu": 8.1,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 174.0,
+          "cpu": 6.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 176.0,
+          "cpu": 9.4,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 178.0,
+          "cpu": 8.65,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 180.0,
+          "cpu": 7.65,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 182.0,
+          "cpu": 11.35,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 184.0,
+          "cpu": 7.55,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 186.0,
+          "cpu": 10.8,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 188.0,
+          "cpu": 6.25,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 190.0,
+          "cpu": 12.4,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 192.0,
+          "cpu": 10.1,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.88
+          }
+        },
+        {
+          "t": 194.03,
+          "cpu": 12.45,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.23
+          }
+        },
+        {
+          "t": 196.0,
+          "cpu": 6.75,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 198.0,
+          "cpu": 9.6,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 200.0,
+          "cpu": 6.25,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 202.0,
+          "cpu": 9.95,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 204.0,
+          "cpu": 10.55,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 206.0,
+          "cpu": 10.5,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 208.0,
+          "cpu": 6.7,
+          "temp": 71.58,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 210.0,
+          "cpu": 8.8,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 212.0,
+          "cpu": 7.6,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 214.0,
+          "cpu": 5.5,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 216.0,
+          "cpu": 10.75,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 218.0,
+          "cpu": 5.55,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 220.0,
+          "cpu": 8.15,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 222.0,
+          "cpu": 8.15,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 224.0,
+          "cpu": 9.25,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 226.0,
+          "cpu": 9.05,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 228.0,
+          "cpu": 12.35,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.63
+          }
+        },
+        {
+          "t": 230.0,
+          "cpu": 7.45,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 232.0,
+          "cpu": 9.2,
+          "temp": 71.33,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 234.0,
+          "cpu": 8.5,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 236.0,
+          "cpu": 7.7,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 238.0,
+          "cpu": 6.5,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 240.0,
+          "cpu": 10.25,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 242.0,
+          "cpu": 6.25,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 244.0,
+          "cpu": 7.25,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 246.0,
+          "cpu": 11.25,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 248.0,
+          "cpu": 7.15,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 250.0,
+          "cpu": 32.05,
+          "temp": 72.55,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 252.0,
+          "cpu": 9.4,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 254.0,
+          "cpu": 7.5,
+          "temp": 72.31,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 256.0,
+          "cpu": 6.55,
+          "temp": 71.33,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 258.0,
+          "cpu": 7.6,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 260.0,
+          "cpu": 6.85,
+          "temp": 71.82,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 262.0,
+          "cpu": 10.55,
+          "temp": 71.33,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.13
+          }
+        },
+        {
+          "t": 264.0,
+          "cpu": 7.5,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 266.0,
+          "cpu": 10.45,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 268.0,
+          "cpu": 10.15,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.13
+          }
+        },
+        {
+          "t": 270.0,
+          "cpu": 8.7,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 272.0,
+          "cpu": 6.5,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 274.0,
+          "cpu": 7.55,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 276.0,
+          "cpu": 5.15,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.12
+          }
+        },
+        {
+          "t": 278.0,
+          "cpu": 9.2,
+          "temp": 71.57,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 280.0,
+          "cpu": 8.55,
+          "temp": 71.33,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 282.0,
+          "cpu": 5.9,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 284.0,
+          "cpu": 11.1,
+          "temp": 71.33,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.25
+          }
+        },
+        {
+          "t": 286.0,
+          "cpu": 9.25,
+          "temp": 70.84,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 288.0,
+          "cpu": 10.7,
+          "temp": 71.33,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 290.0,
+          "cpu": 6.7,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.87
+          }
+        },
+        {
+          "t": 292.0,
+          "cpu": 9.85,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 294.0,
+          "cpu": 5.7,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 296.0,
+          "cpu": 9.65,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 298.0,
+          "cpu": 4.0,
+          "temp": 71.33,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 300.0,
+          "cpu": 6.6,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 302.01,
+          "cpu": 8.05,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.13
+          }
+        },
+        {
+          "t": 304.0,
+          "cpu": 7.75,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 306.0,
+          "cpu": 6.65,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 308.0,
+          "cpu": 8.1,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.88
+          }
+        },
+        {
+          "t": 310.0,
+          "cpu": 11.55,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        },
+        {
+          "t": 312.0,
+          "cpu": 6.9,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 314.0,
+          "cpu": 11.25,
+          "temp": 70.36,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 316.0,
+          "cpu": 3.2,
+          "temp": 70.84,
+          "mhz": 1250.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.12
+          }
+        },
+        {
+          "t": 318.0,
+          "cpu": 5.9,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 320.0,
+          "cpu": 6.3,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 322.0,
+          "cpu": 9.95,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 324.0,
+          "cpu": 8.75,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 326.0,
+          "cpu": 8.55,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 328.0,
+          "cpu": 12.1,
+          "temp": 71.82,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 330.0,
+          "cpu": 6.1,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 332.0,
+          "cpu": 6.45,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 334.0,
+          "cpu": 6.25,
+          "temp": 70.6,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 336.0,
+          "cpu": 8.9,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 338.0,
+          "cpu": 6.2,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 340.0,
+          "cpu": 6.45,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 342.0,
+          "cpu": 5.15,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 344.0,
+          "cpu": 5.5,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 346.0,
+          "cpu": 8.95,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 348.0,
+          "cpu": 7.5,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 350.0,
+          "cpu": 12.7,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.88
+          }
+        },
+        {
+          "t": 352.0,
+          "cpu": 6.4,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 354.0,
+          "cpu": 7.05,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 356.0,
+          "cpu": 5.55,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 358.0,
+          "cpu": 14.95,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.75
+          }
+        },
+        {
+          "t": 360.0,
+          "cpu": 11.55,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.62
+          }
+        },
+        {
+          "t": 362.0,
+          "cpu": 12.55,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 364.0,
+          "cpu": 8.85,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 366.0,
+          "cpu": 12.3,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 368.0,
+          "cpu": 8.6,
+          "temp": 71.33,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 370.0,
+          "cpu": 7.55,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.37
+          }
+        },
+        {
+          "t": 372.0,
+          "cpu": 8.6,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 374.0,
+          "cpu": 7.55,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 376.0,
+          "cpu": 7.1,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 378.0,
+          "cpu": 4.25,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 380.0,
+          "cpu": 9.85,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 382.0,
+          "cpu": 7.15,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 384.0,
+          "cpu": 12.45,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        },
+        {
+          "t": 386.0,
+          "cpu": 11.15,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.63
+          }
+        },
+        {
+          "t": 388.0,
+          "cpu": 13.0,
+          "temp": 71.33,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.5
+          }
+        },
+        {
+          "t": 390.0,
+          "cpu": 5.15,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 392.0,
+          "cpu": 6.6,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 394.0,
+          "cpu": 7.8,
+          "temp": 71.09,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 396.0,
+          "cpu": 13.95,
+          "temp": 70.36,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.5
+          }
+        },
+        {
+          "t": 398.0,
+          "cpu": 8.0,
+          "temp": 70.6,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 400.0,
+          "cpu": 9.85,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.88
+          }
+        },
+        {
+          "t": 402.0,
+          "cpu": 9.5,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 404.0,
+          "cpu": 4.05,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 406.0,
+          "cpu": 7.8,
+          "temp": 71.09,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 408.0,
+          "cpu": 11.15,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.38
+          }
+        },
+        {
+          "t": 410.0,
+          "cpu": 12.75,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 412.0,
+          "cpu": 5.9,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 414.0,
+          "cpu": 8.1,
+          "temp": 71.33,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 416.0,
+          "cpu": 8.25,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 418.0,
+          "cpu": 8.9,
+          "temp": 71.33,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 420.0,
+          "cpu": 4.1,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 422.0,
+          "cpu": 6.9,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.87
+          }
+        },
+        {
+          "t": 424.0,
+          "cpu": 8.75,
+          "temp": 70.84,
+          "mhz": 1200.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 426.0,
+          "cpu": 8.05,
+          "temp": 71.33,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.27
+          }
+        },
+        {
+          "t": 428.0,
+          "cpu": 10.15,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 430.0,
+          "cpu": 5.7,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 432.0,
+          "cpu": 9.35,
+          "temp": 70.36,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 434.0,
+          "cpu": 8.25,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 436.0,
+          "cpu": 6.35,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 438.0,
+          "cpu": 4.65,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 440.0,
+          "cpu": 8.8,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 442.0,
+          "cpu": 5.55,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 444.0,
+          "cpu": 8.3,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 446.0,
+          "cpu": 8.4,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 448.0,
+          "cpu": 11.65,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 450.0,
+          "cpu": 7.15,
+          "temp": 69.38,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 452.0,
+          "cpu": 8.4,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 454.0,
+          "cpu": 7.3,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 456.0,
+          "cpu": 5.85,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 458.0,
+          "cpu": 6.7,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 460.0,
+          "cpu": 5.95,
+          "temp": 70.6,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 462.0,
+          "cpu": 13.2,
+          "temp": 71.57,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 464.0,
+          "cpu": 8.0,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 466.0,
+          "cpu": 9.6,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 468.0,
+          "cpu": 9.2,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 470.0,
+          "cpu": 11.15,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 472.0,
+          "cpu": 6.65,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 474.0,
+          "cpu": 8.05,
+          "temp": 69.87,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 476.0,
+          "cpu": 3.6,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 478.0,
+          "cpu": 6.8,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 480.0,
+          "cpu": 6.85,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 482.0,
+          "cpu": 9.0,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 484.0,
+          "cpu": 9.15,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 486.0,
+          "cpu": 6.35,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 488.0,
+          "cpu": 10.25,
+          "temp": 70.11,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 490.0,
+          "cpu": 10.15,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.25
+          }
+        },
+        {
+          "t": 492.0,
+          "cpu": 12.85,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 494.0,
+          "cpu": 8.75,
+          "temp": 70.6,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.37
+          }
+        },
+        {
+          "t": 496.0,
+          "cpu": 7.15,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 498.0,
+          "cpu": 4.75,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 500.0,
+          "cpu": 8.5,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 502.0,
+          "cpu": 5.9,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 504.0,
+          "cpu": 7.25,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 506.0,
+          "cpu": 8.3,
+          "temp": 71.09,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 508.0,
+          "cpu": 12.4,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 510.0,
+          "cpu": 8.2,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 512.0,
+          "cpu": 9.35,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 514.0,
+          "cpu": 10.35,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.88
+          }
+        },
+        {
+          "t": 516.0,
+          "cpu": 7.9,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 518.0,
+          "cpu": 10.55,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 520.0,
+          "cpu": 6.7,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.88
+          }
+        },
+        {
+          "t": 522.0,
+          "cpu": 11.55,
+          "temp": 70.6,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 524.0,
+          "cpu": 6.9,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 526.0,
+          "cpu": 9.0,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 528.0,
+          "cpu": 6.7,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 530.0,
+          "cpu": 6.1,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 532.05,
+          "cpu": 8.95,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.76
+          }
+        },
+        {
+          "t": 534.0,
+          "cpu": 6.95,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 536.0,
+          "cpu": 4.1,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 538.0,
+          "cpu": 11.8,
+          "temp": 71.57,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.75
+          }
+        },
+        {
+          "t": 540.0,
+          "cpu": 8.75,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 542.0,
+          "cpu": 6.5,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 544.0,
+          "cpu": 9.95,
+          "temp": 71.58,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 546.0,
+          "cpu": 7.75,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 548.0,
+          "cpu": 11.3,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 550.0,
+          "cpu": 6.4,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 552.0,
+          "cpu": 9.0,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 554.0,
+          "cpu": 7.05,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 556.0,
+          "cpu": 7.25,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 558.0,
+          "cpu": 4.1,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 560.0,
+          "cpu": 8.5,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 562.0,
+          "cpu": 6.75,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 564.0,
+          "cpu": 7.15,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 566.0,
+          "cpu": 8.6,
+          "temp": 71.33,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 568.0,
+          "cpu": 5.85,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 570.0,
+          "cpu": 10.0,
+          "temp": 70.6,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 572.0,
+          "cpu": 6.3,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 574.0,
+          "cpu": 8.45,
+          "temp": 70.11,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 576.0,
+          "cpu": 5.05,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 578.0,
+          "cpu": 6.2,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 580.0,
+          "cpu": 6.8,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 582.0,
+          "cpu": 10.45,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.13
+          }
+        },
+        {
+          "t": 584.0,
+          "cpu": 7.15,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 586.0,
+          "cpu": 4.9,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 588.0,
+          "cpu": 7.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 590.0,
+          "cpu": 6.7,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 592.0,
+          "cpu": 8.3,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 594.0,
+          "cpu": 3.9,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 596.0,
+          "cpu": 7.05,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 598.0,
+          "cpu": 5.8,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 600.0,
+          "cpu": 9.55,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 602.0,
+          "cpu": 6.5,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 604.0,
+          "cpu": 5.8,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 606.0,
+          "cpu": 4.75,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 608.0,
+          "cpu": 10.65,
+          "temp": 70.11,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 610.0,
+          "cpu": 9.55,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.63
+          }
+        },
+        {
+          "t": 612.0,
+          "cpu": 11.3,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.25
+          }
+        },
+        {
+          "t": 614.0,
+          "cpu": 5.5,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 616.0,
+          "cpu": 6.3,
+          "temp": 70.84,
+          "mhz": 1250.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 618.0,
+          "cpu": 9.95,
+          "temp": 71.58,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 620.0,
+          "cpu": 5.9,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 622.0,
+          "cpu": 9.3,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 624.0,
+          "cpu": 6.4,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 626.0,
+          "cpu": 9.5,
+          "temp": 70.11,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.43
+          }
+        },
+        {
+          "t": 628.0,
+          "cpu": 4.75,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.53
+          }
+        },
+        {
+          "t": 630.01,
+          "cpu": 6.2,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 632.0,
+          "cpu": 8.2,
+          "temp": 70.36,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 634.0,
+          "cpu": 15.0,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.25
+          }
+        },
+        {
+          "t": 636.0,
+          "cpu": 9.25,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.87
+          }
+        },
+        {
+          "t": 638.0,
+          "cpu": 10.75,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 640.0,
+          "cpu": 10.2,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 642.0,
+          "cpu": 8.5,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.37
+          }
+        },
+        {
+          "t": 644.0,
+          "cpu": 10.55,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 646.0,
+          "cpu": 5.5,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 648.01,
+          "cpu": 11.45,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.26
+          }
+        },
+        {
+          "t": 650.0,
+          "cpu": 6.75,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.87
+          }
+        },
+        {
+          "t": 652.0,
+          "cpu": 10.65,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 654.0,
+          "cpu": 7.55,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 656.0,
+          "cpu": 14.05,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.38
+          }
+        },
+        {
+          "t": 658.0,
+          "cpu": 10.55,
+          "temp": 70.84,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.87
+          }
+        },
+        {
+          "t": 660.0,
+          "cpu": 11.55,
+          "temp": 70.6,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 662.0,
+          "cpu": 7.3,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 664.0,
+          "cpu": 9.35,
+          "temp": 70.6,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.63
+          }
+        },
+        {
+          "t": 666.0,
+          "cpu": 5.0,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.25
+          }
+        },
+        {
+          "t": 668.0,
+          "cpu": 3.25,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.0
+          }
+        },
+        {
+          "t": 670.0,
+          "cpu": 7.8,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 672.0,
+          "cpu": 6.65,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 674.0,
+          "cpu": 7.65,
+          "temp": 71.57,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 676.0,
+          "cpu": 4.0,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 678.0,
+          "cpu": 8.95,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 680.0,
+          "cpu": 6.2,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 682.0,
+          "cpu": 10.1,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 684.0,
+          "cpu": 6.55,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 686.0,
+          "cpu": 9.3,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 688.0,
+          "cpu": 6.3,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 690.0,
+          "cpu": 6.95,
+          "temp": 70.11,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 692.0,
+          "cpu": 5.65,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 694.0,
+          "cpu": 11.3,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.12
+          }
+        },
+        {
+          "t": 696.0,
+          "cpu": 5.8,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 698.0,
+          "cpu": 4.0,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 700.0,
+          "cpu": 6.7,
+          "temp": 71.33,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 702.0,
+          "cpu": 5.3,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 704.0,
+          "cpu": 9.05,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 706.0,
+          "cpu": 7.45,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 708.0,
+          "cpu": 10.8,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 710.0,
+          "cpu": 10.15,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.99
+          }
+        },
+        {
+          "t": 712.0,
+          "cpu": 11.4,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.88
+          }
+        },
+        {
+          "t": 714.0,
+          "cpu": 6.85,
+          "temp": 70.36,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 716.0,
+          "cpu": 8.35,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 718.0,
+          "cpu": 7.45,
+          "temp": 71.82,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.37
+          }
+        },
+        {
+          "t": 720.0,
+          "cpu": 7.65,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 722.0,
+          "cpu": 10.85,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.87
+          }
+        },
+        {
+          "t": 724.0,
+          "cpu": 5.55,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 726.0,
+          "cpu": 10.15,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 728.0,
+          "cpu": 4.15,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.87
+          }
+        },
+        {
+          "t": 730.0,
+          "cpu": 6.7,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 732.0,
+          "cpu": 11.25,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.0
+          }
+        },
+        {
+          "t": 734.0,
+          "cpu": 12.55,
+          "temp": 71.09,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.75
+          }
+        },
+        {
+          "t": 736.0,
+          "cpu": 4.15,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 738.0,
+          "cpu": 7.65,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 740.0,
+          "cpu": 10.25,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.25
+          }
+        },
+        {
+          "t": 742.0,
+          "cpu": 12.7,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 744.0,
+          "cpu": 7.15,
+          "temp": 70.11,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 746.0,
+          "cpu": 9.0,
+          "temp": 70.36,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 748.0,
+          "cpu": 6.8,
+          "temp": 70.36,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 750.0,
+          "cpu": 5.9,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 752.0,
+          "cpu": 9.0,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 754.0,
+          "cpu": 7.95,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 756.0,
+          "cpu": 9.8,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 758.0,
+          "cpu": 9.15,
+          "temp": 70.11,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.88
+          }
+        },
+        {
+          "t": 760.0,
+          "cpu": 16.25,
+          "temp": 70.6,
+          "mhz": 1200.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.62
+          }
+        },
+        {
+          "t": 762.0,
+          "cpu": 4.05,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 764.0,
+          "cpu": 6.15,
+          "temp": 69.63,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 766.0,
+          "cpu": 5.2,
+          "temp": 70.11,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 768.0,
+          "cpu": 9.0,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 770.0,
+          "cpu": 6.1,
+          "temp": 70.36,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 772.0,
+          "cpu": 9.4,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 774.0,
+          "cpu": 5.3,
+          "temp": 69.63,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 776.0,
+          "cpu": 8.35,
+          "temp": 70.6,
+          "mhz": 1250.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 778.0,
+          "cpu": 4.9,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 780.0,
+          "cpu": 6.0,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 782.0,
+          "cpu": 13.35,
+          "temp": 71.09,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.87
+          }
+        },
+        {
+          "t": 784.0,
+          "cpu": 10.7,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.25
+          }
+        },
+        {
+          "t": 786.0,
+          "cpu": 12.75,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 788.0,
+          "cpu": 8.0,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 790.0,
+          "cpu": 11.75,
+          "temp": 70.11,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.25
+          }
+        },
+        {
+          "t": 792.0,
+          "cpu": 6.15,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 794.0,
+          "cpu": 10.65,
+          "temp": 69.63,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 796.0,
+          "cpu": 4.0,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 798.0,
+          "cpu": 7.1,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 800.0,
+          "cpu": 6.0,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 802.0,
+          "cpu": 14.75,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 10.76
+          }
+        },
+        {
+          "t": 804.0,
+          "cpu": 4.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.0
+          }
+        },
+        {
+          "t": 806.0,
+          "cpu": 6.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 808.0,
+          "cpu": 6.25,
+          "temp": 70.84,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 810.0,
+          "cpu": 7.8,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 812.0,
+          "cpu": 9.5,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 814.0,
+          "cpu": 7.1,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 816.0,
+          "cpu": 12.3,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 818.0,
+          "cpu": 11.1,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.87
+          }
+        },
+        {
+          "t": 820.0,
+          "cpu": 11.1,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        },
+        {
+          "t": 822.0,
+          "cpu": 6.5,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 824.0,
+          "cpu": 11.1,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 826.0,
+          "cpu": 4.9,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 828.0,
+          "cpu": 7.5,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 830.0,
+          "cpu": 10.05,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.34
+          }
+        },
+        {
+          "t": 832.0,
+          "cpu": 6.4,
+          "temp": 71.58,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.19
+          }
+        },
+        {
+          "t": 834.0,
+          "cpu": 5.55,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.86
+          }
+        },
+        {
+          "t": 836.0,
+          "cpu": 12.5,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.26
+          }
+        },
+        {
+          "t": 838.0,
+          "cpu": 8.8,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 840.0,
+          "cpu": 7.25,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 842.0,
+          "cpu": 8.2,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 844.0,
+          "cpu": 5.6,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 846.0,
+          "cpu": 10.35,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.68
+          }
+        },
+        {
+          "t": 848.0,
+          "cpu": 7.45,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.02
+          }
+        },
+        {
+          "t": 850.0,
+          "cpu": 9.45,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 852.0,
+          "cpu": 7.15,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 854.0,
+          "cpu": 14.4,
+          "temp": 69.14,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.62
+          }
+        },
+        {
+          "t": 856.0,
+          "cpu": 5.65,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 858.0,
+          "cpu": 6.6,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 860.0,
+          "cpu": 6.6,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 862.0,
+          "cpu": 9.9,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 864.0,
+          "cpu": 5.95,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 866.0,
+          "cpu": 8.65,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 868.0,
+          "cpu": 3.85,
+          "temp": 69.87,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 870.0,
+          "cpu": 5.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 872.0,
+          "cpu": 7.55,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 874.0,
+          "cpu": 7.55,
+          "temp": 69.14,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 876.0,
+          "cpu": 12.35,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.0
+          }
+        },
+        {
+          "t": 878.0,
+          "cpu": 35.45,
+          "temp": 71.82,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 880.0,
+          "cpu": 17.2,
+          "temp": 72.06,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 882.0,
+          "cpu": 5.5,
+          "temp": 71.58,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 884.0,
+          "cpu": 9.35,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 886.0,
+          "cpu": 6.2,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 888.0,
+          "cpu": 9.25,
+          "temp": 69.87,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 890.0,
+          "cpu": 5.9,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 892.0,
+          "cpu": 9.05,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 894.0,
+          "cpu": 10.6,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 896.0,
+          "cpu": 9.8,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 898.0,
+          "cpu": 4.65,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 900.0,
+          "cpu": 6.15,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 902.0,
+          "cpu": 9.05,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 904.0,
+          "cpu": 7.05,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 906.0,
+          "cpu": 9.55,
+          "temp": 71.33,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 908.0,
+          "cpu": 4.2,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 910.0,
+          "cpu": 6.9,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 912.0,
+          "cpu": 5.85,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 914.0,
+          "cpu": 7.2,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 916.0,
+          "cpu": 5.15,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 918.0,
+          "cpu": 10.7,
+          "temp": 71.09,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 920.0,
+          "cpu": 10.2,
+          "temp": 71.57,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.88
+          }
+        },
+        {
+          "t": 922.0,
+          "cpu": 7.45,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 924.0,
+          "cpu": 8.15,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        },
+        {
+          "t": 926.0,
+          "cpu": 11.5,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.87
+          }
+        },
+        {
+          "t": 928.0,
+          "cpu": 6.0,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 930.0,
+          "cpu": 7.4,
+          "temp": 70.6,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 932.0,
+          "cpu": 10.0,
+          "temp": 70.6,
+          "mhz": 1250.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 934.0,
+          "cpu": 4.65,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 936.0,
+          "cpu": 8.4,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 938.0,
+          "cpu": 6.55,
+          "temp": 70.36,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 940.0,
+          "cpu": 12.9,
+          "temp": 70.84,
+          "mhz": 1200.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.01
+          }
+        },
+        {
+          "t": 942.0,
+          "cpu": 8.5,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 944.0,
+          "cpu": 9.5,
+          "temp": 71.09,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 946.0,
+          "cpu": 9.2,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.37
+          }
+        },
+        {
+          "t": 948.0,
+          "cpu": 10.4,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.63
+          }
+        },
+        {
+          "t": 950.0,
+          "cpu": 4.75,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 952.0,
+          "cpu": 6.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.25
+          }
+        },
+        {
+          "t": 954.0,
+          "cpu": 5.75,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 956.0,
+          "cpu": 9.1,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 958.0,
+          "cpu": 6.0,
+          "temp": 69.63,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 960.0,
+          "cpu": 7.75,
+          "temp": 70.11,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 962.0,
+          "cpu": 4.9,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.25
+          }
+        },
+        {
+          "t": 964.0,
+          "cpu": 4.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.25
+          }
+        },
+        {
+          "t": 966.0,
+          "cpu": 7.4,
+          "temp": 71.33,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 968.0,
+          "cpu": 6.1,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 970.0,
+          "cpu": 9.85,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 972.0,
+          "cpu": 5.8,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 974.0,
+          "cpu": 8.85,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.88
+          }
+        },
+        {
+          "t": 976.0,
+          "cpu": 4.0,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 978.0,
+          "cpu": 8.25,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 980.0,
+          "cpu": 6.25,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.48
+          }
+        },
+        {
+          "t": 982.0,
+          "cpu": 7.35,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.27
+          }
+        },
+        {
+          "t": 984.0,
+          "cpu": 7.65,
+          "temp": 71.09,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 986.0,
+          "cpu": 7.05,
+          "temp": 70.84,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 988.0,
+          "cpu": 5.45,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 990.0,
+          "cpu": 10.1,
+          "temp": 72.31,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 992.0,
+          "cpu": 10.3,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.89
+          }
+        },
+        {
+          "t": 994.0,
+          "cpu": 8.15,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.62
+          }
+        },
+        {
+          "t": 996.0,
+          "cpu": 10.15,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.39
+          }
+        },
+        {
+          "t": 998.0,
+          "cpu": 7.0,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 1000.0,
+          "cpu": 9.7,
+          "temp": 70.36,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.87
+          }
+        },
+        {
+          "t": 1002.0,
+          "cpu": 5.9,
+          "temp": 70.6,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1004.0,
+          "cpu": 9.15,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 1006.0,
+          "cpu": 8.25,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 1008.0,
+          "cpu": 9.9,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.87
+          }
+        },
+        {
+          "t": 1010.0,
+          "cpu": 6.9,
+          "temp": 69.14,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 1012.0,
+          "cpu": 10.7,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.62
+          }
+        },
+        {
+          "t": 1014.0,
+          "cpu": 7.15,
+          "temp": 70.36,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 1016.0,
+          "cpu": 9.35,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.38
+          }
+        },
+        {
+          "t": 1018.0,
+          "cpu": 7.3,
+          "temp": 69.87,
+          "mhz": 600.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 1020.0,
+          "cpu": 6.4,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1022.0,
+          "cpu": 7.35,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.75
+          }
+        },
+        {
+          "t": 1024.01,
+          "cpu": 9.25,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.73
+          }
+        },
+        {
+          "t": 1026.0,
+          "cpu": 9.55,
+          "temp": 69.87,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 1028.0,
+          "cpu": 6.1,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 1030.0,
+          "cpu": 9.55,
+          "temp": 70.36,
+          "mhz": 1000.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 1032.0,
+          "cpu": 6.15,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1034.0,
+          "cpu": 9.6,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 1036.0,
+          "cpu": 3.4,
+          "temp": 69.87,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 1038.0,
+          "cpu": 6.8,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 1040.0,
+          "cpu": 6.7,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 1042.0,
+          "cpu": 12.4,
+          "temp": 70.36,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.62
+          }
+        },
+        {
+          "t": 1044.01,
+          "cpu": 9.85,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.1
+          }
+        },
+        {
+          "t": 1046.0,
+          "cpu": 4.4,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.5
+          }
+        },
+        {
+          "t": 1048.0,
+          "cpu": 5.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.38
+          }
+        },
+        {
+          "t": 1050.0,
+          "cpu": 5.2,
+          "temp": 69.14,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 1052.0,
+          "cpu": 8.85,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1054.0,
+          "cpu": 5.8,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1056.0,
+          "cpu": 9.9,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 1058.0,
+          "cpu": 5.6,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1060.0,
+          "cpu": 7.35,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.25
+          }
+        },
+        {
+          "t": 1062.0,
+          "cpu": 4.9,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.25
+          }
+        },
+        {
+          "t": 1064.0,
+          "cpu": 7.55,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 1066.0,
+          "cpu": 8.45,
+          "temp": 70.6,
+          "mhz": 1200.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.5
+          }
+        },
+        {
+          "t": 1068.0,
+          "cpu": 14.25,
+          "temp": 70.11,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.62
+          }
+        },
+        {
+          "t": 1070.0,
+          "cpu": 7.8,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.62
+          }
+        },
+        {
+          "t": 1072.0,
+          "cpu": 8.95,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 1074.0,
+          "cpu": 6.5,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1076.0,
+          "cpu": 6.6,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1078.0,
+          "cpu": 10.05,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        },
+        {
+          "t": 1080.0,
+          "cpu": 6.3,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1082.0,
+          "cpu": 9.75,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1084.0,
+          "cpu": 5.4,
+          "temp": 69.14,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 1086.0,
+          "cpu": 7.5,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 1088.0,
+          "cpu": 3.3,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.12
+          }
+        },
+        {
+          "t": 1090.0,
+          "cpu": 6.05,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.38
+          }
+        },
+        {
+          "t": 1092.0,
+          "cpu": 7.2,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.25
+          }
+        },
+        {
+          "t": 1094.0,
+          "cpu": 7.85,
+          "temp": 69.87,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 1096.0,
+          "cpu": 4.15,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 1098.0,
+          "cpu": 9.0,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.12
+          }
+        },
+        {
+          "t": 1100.0,
+          "cpu": 7.35,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 1102.0,
+          "cpu": 14.75,
+          "temp": 69.38,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.37
+          }
+        },
+        {
+          "t": 1104.0,
+          "cpu": 10.0,
+          "temp": 69.87,
+          "mhz": 900.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.13
+          }
+        },
+        {
+          "t": 1106.0,
+          "cpu": 8.7,
+          "temp": 70.6,
+          "mhz": 950.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.0
+          }
+        },
+        {
+          "t": 1108.0,
+          "cpu": 12.05,
+          "temp": 70.36,
+          "mhz": 850.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.12
+          }
+        },
+        {
+          "t": 1110.0,
+          "cpu": 6.75,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 1112.0,
+          "cpu": 9.9,
+          "temp": 69.87,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.0
+          }
+        },
+        {
+          "t": 1114.0,
+          "cpu": 5.45,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1116.0,
+          "cpu": 9.0,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1118.0,
+          "cpu": 5.25,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.13
+          }
+        },
+        {
+          "t": 1120.0,
+          "cpu": 5.75,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 1122.0,
+          "cpu": 4.75,
+          "temp": 70.6,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.87
+          }
+        },
+        {
+          "t": 1124.0,
+          "cpu": 10.05,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.75
+          }
+        },
+        {
+          "t": 1126.0,
+          "cpu": 7.4,
+          "temp": 70.11,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.12
+          }
+        },
+        {
+          "t": 1128.0,
+          "cpu": 10.2,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 1130.0,
+          "cpu": 8.2,
+          "temp": 69.38,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.75
+          }
+        },
+        {
+          "t": 1132.0,
+          "cpu": 12.45,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.38
+          }
+        },
+        {
+          "t": 1134.0,
+          "cpu": 10.35,
+          "temp": 70.84,
+          "mhz": 1150.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.88
+          }
+        },
+        {
+          "t": 1136.0,
+          "cpu": 5.95,
+          "temp": 71.33,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.62
+          }
+        },
+        {
+          "t": 1138.0,
+          "cpu": 9.05,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.74
+          }
+        },
+        {
+          "t": 1140.0,
+          "cpu": 9.05,
+          "temp": 70.6,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.13
+          }
+        },
+        {
+          "t": 1142.0,
+          "cpu": 10.05,
+          "temp": 70.36,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1144.0,
+          "cpu": 5.05,
+          "temp": 71.09,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.13
+          }
+        },
+        {
+          "t": 1146.0,
+          "cpu": 7.95,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.5
+          }
+        },
+        {
+          "t": 1148.0,
+          "cpu": 4.0,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.62
+          }
+        },
+        {
+          "t": 1150.0,
+          "cpu": 6.9,
+          "temp": 70.36,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.0
+          }
+        },
+        {
+          "t": 1152.0,
+          "cpu": 8.3,
+          "temp": 70.36,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.37
+          }
+        },
+        {
+          "t": 1154.0,
+          "cpu": 15.2,
+          "temp": 70.84,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 11.01
+          }
+        },
+        {
+          "t": 1156.0,
+          "cpu": 3.9,
+          "temp": 70.36,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 1158.0,
+          "cpu": 6.65,
+          "temp": 70.11,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.88
+          }
+        },
+        {
+          "t": 1160.0,
+          "cpu": 6.55,
+          "temp": 70.84,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 6.5
+          }
+        },
+        {
+          "t": 1162.0,
+          "cpu": 9.95,
+          "temp": 70.36,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.74
+          }
+        },
+        {
+          "t": 1164.0,
+          "cpu": 7.55,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.5
+          }
+        },
+        {
+          "t": 1166.0,
+          "cpu": 6.0,
+          "temp": 69.63,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.38
+          }
+        },
+        {
+          "t": 1168.0,
+          "cpu": 9.6,
+          "temp": 69.14,
+          "mhz": 700.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.87
+          }
+        },
+        {
+          "t": 1170.0,
+          "cpu": 6.4,
+          "temp": 69.87,
+          "mhz": 1100.0,
+          "thr": false,
+          "procs": {
+            "assistant": 5.88
+          }
+        },
+        {
+          "t": 1172.0,
+          "cpu": 6.6,
+          "temp": 70.6,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 4.12
+          }
+        },
+        {
+          "t": 1174.0,
+          "cpu": 4.35,
+          "temp": 70.84,
+          "mhz": 1500.0,
+          "thr": false,
+          "procs": {
+            "assistant": 3.75
+          }
+        },
+        {
+          "t": 1176.0,
+          "cpu": 13.05,
+          "temp": 69.87,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 8.12
+          }
+        },
+        {
+          "t": 1178.0,
+          "cpu": 10.55,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 9.61
+          }
+        },
+        {
+          "t": 1180.0,
+          "cpu": 12.4,
+          "temp": 69.63,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.75
+          }
+        },
+        {
+          "t": 1182.0,
+          "cpu": 8.75,
+          "temp": 70.11,
+          "mhz": 800.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.38
+          }
+        },
+        {
+          "t": 1184.0,
+          "cpu": 10.85,
+          "temp": 70.6,
+          "mhz": 750.0,
+          "thr": false,
+          "procs": {
+            "assistant": 7.5
+          }
+        }
+      ]
+    },
+    "trial_lanes": [
+      [
+        671.93,
+        682.13,
+        "false_tt"
+      ],
+      [
+        555.88,
+        567.54,
+        "false_tt"
+      ],
+      [
+        151.69,
+        161.84,
+        "stage_latency"
+      ],
+      [
+        5.04,
+        25.37,
+        "stage_latency"
+      ],
+      [
+        92.26,
+        107.09,
+        "stage_latency"
+      ],
+      [
+        80.45,
+        86.19,
+        "stage_latency"
+      ],
+      [
+        167.93,
+        174.9,
+        "stage_latency"
+      ],
+      [
+        61.77,
+        74.35,
+        "stage_latency"
+      ],
+      [
+        48.73,
+        55.7,
+        "stage_latency"
+      ],
+      [
+        113.19,
+        125.07,
+        "stage_latency"
+      ],
+      [
+        131.15,
+        145.58,
+        "stage_latency"
+      ],
+      [
+        31.5,
+        42.64,
+        "stage_latency"
+      ],
+      [
+        688.18,
+        699.12,
+        "v15_backchannel"
+      ],
+      [
+        705.2,
+        719.28,
+        "v15_backchannel"
+      ],
+      [
+        753.38,
+        769.84,
+        "v15_background"
+      ],
+      [
+        775.94,
+        788.85,
+        "v15_background"
+      ],
+      [
+        601.66,
+        620.24,
+        "v15_interruption"
+      ],
+      [
+        626.36,
+        637.45,
+        "v15_interruption"
+      ],
+      [
+        824.13,
+        840.56,
+        "v15_talking_to_other"
+      ],
+      [
+        846.67,
+        862.64,
+        "v15_talking_to_other"
+      ],
+      [
+        725.35,
+        747.25,
+        "v1_interrupt"
+      ],
+      [
+        794.92,
+        818.03,
+        "v1_pause_candor"
+      ],
+      [
+        643.52,
+        665.84,
+        "v1_pause_synth"
+      ],
+      [
+        573.61,
+        595.57,
+        "v1_turntaking"
+      ],
+      [
+        1076.9,
+        1086.25,
+        "false_tt"
+      ],
+      [
+        956.61,
+        967.7,
+        "false_tt"
+      ],
+      [
+        295.9,
+        313.33,
+        "stage_latency"
+      ],
+      [
+        351.27,
+        368.85,
+        "stage_latency"
+      ],
+      [
+        193.52,
+        212.85,
+        "stage_latency"
+      ],
+      [
+        180.96,
+        187.44,
+        "stage_latency"
+      ],
+      [
+        337.37,
+        345.2,
+        "stage_latency"
+      ],
+      [
+        319.43,
+        331.28,
+        "stage_latency"
+      ],
+      [
+        259.36,
+        271.92,
+        "stage_latency"
+      ],
+      [
+        240.4,
+        253.26,
+        "stage_latency"
+      ],
+      [
+        218.99,
+        234.29,
+        "stage_latency"
+      ],
+      [
+        278.01,
+        289.81,
+        "stage_latency"
+      ],
+      [
+        868.71,
+        888.4,
+        "v15_backchannel"
+      ],
+      [
+        894.53,
+        904.85,
+        "v15_backchannel"
+      ],
+      [
+        1034.27,
+        1053.01,
+        "v15_background"
+      ],
+      [
+        1059.16,
+        1070.83,
+        "v15_background"
+      ],
+      [
+        910.92,
+        927.25,
+        "v15_interruption"
+      ],
+      [
+        933.37,
+        950.51,
+        "v15_interruption"
+      ],
+      [
+        1146.36,
+        1163.66,
+        "v15_talking_to_other"
+      ],
+      [
+        1169.79,
+        1185.2,
+        "v15_talking_to_other"
+      ],
+      [
+        973.78,
+        999.77,
+        "v1_interrupt"
+      ],
+      [
+        1005.94,
+        1028.17,
+        "v1_pause_candor"
+      ],
+      [
+        1116.97,
+        1140.25,
+        "v1_pause_synth"
+      ],
+      [
+        1092.33,
+        1110.87,
+        "v1_turntaking"
+      ],
+      [
+        494.91,
+        509.39,
+        "stage_latency"
+      ],
+      [
+        454.92,
+        471.34,
+        "stage_latency"
+      ],
+      [
+        477.45,
+        488.82,
+        "stage_latency"
+      ],
+      [
+        374.97,
+        381.65,
+        "stage_latency"
+      ],
+      [
+        387.72,
+        394.32,
+        "stage_latency"
+      ],
+      [
+        515.5,
+        524.52,
+        "stage_latency"
+      ],
+      [
+        417.79,
+        428.85,
+        "stage_latency"
+      ],
+      [
+        434.94,
+        448.82,
+        "stage_latency"
+      ],
+      [
+        400.38,
+        411.7,
+        "stage_latency"
+      ],
+      [
+        530.6,
+        549.75,
+        "stage_latency"
+      ]
+    ]
+  }
+}

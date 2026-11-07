@@ -1,0 +1,1077 @@
+{
+  "about": "Stage latency per turn (course template, section 5). Times in seconds on the assistant machine's monotonic clock; e2e = audio_out - vad_end; e2e_heard = reply audio start - true end of speech (fdbench's audio clock); endpointing = vad_end - true end of speech.",
+  "phrases": 10,
+  "runs": 3,
+  "turns": [
+    {
+      "trial": "r01_stage_latency_phrase_v15_backchannel_11",
+      "run": 1,
+      "clip": "phrase_v15_backchannel_11",
+      "ref": "Summarize black holes comprehensively.",
+      "e2e": 4.0393,
+      "e2e_source": "marks",
+      "e2e_heard": 4.612,
+      "endpointing": 0.5556,
+      "asr_final": 0.3083,
+      "llm_ttft": 3.3425,
+      "tts_ttfb": 0.2861,
+      "transcript": "Summarize black holes comprehensively.",
+      "context_tokens": 1693,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_backchannel_51",
+      "run": 1,
+      "clip": "phrase_v15_backchannel_51",
+      "ref": "Describe tsunamis comprehensively.",
+      "e2e": 2.9449,
+      "e2e_source": "marks",
+      "e2e_heard": 4.036,
+      "endpointing": 0.5528,
+      "asr_final": 0.232,
+      "llm_ttft": 2.4011,
+      "tts_ttfb": 0.2624,
+      "transcript": "Describe tsunamis comprehensively.",
+      "context_tokens": 1442,
+      "context_messages": 2,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 3,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_backchannel_90",
+      "run": 1,
+      "clip": "phrase_v15_backchannel_90",
+      "ref": "Discuss moral dilemmas fully.",
+      "e2e": 3.0548,
+      "e2e_source": "marks",
+      "e2e_heard": 3.684,
+      "endpointing": 0.5291,
+      "asr_final": 0.2856,
+      "llm_ttft": 2.4723,
+      "tts_ttfb": 0.2795,
+      "transcript": "Discuss moral dilemmas fully.",
+      "context_tokens": 1703,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_background_29",
+      "run": 1,
+      "clip": "phrase_v15_background_29",
+      "ref": "When is the next full moon?",
+      "e2e": 1.4745,
+      "e2e_source": "marks",
+      "e2e_heard": 2.308,
+      "endpointing": 0.5586,
+      "asr_final": 0.2343,
+      "llm_ttft": 1.1705,
+      "tts_ttfb": null,
+      "transcript": "When is the next full moon?",
+      "context_tokens": 1656,
+      "context_messages": 10,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 6,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_background_70",
+      "run": 1,
+      "clip": "phrase_v15_background_70",
+      "ref": "Text Alex 'I'll be there in five'.",
+      "e2e": 2.3383,
+      "e2e_source": "marks",
+      "e2e_heard": 2.916,
+      "endpointing": 0.5557,
+      "asr_final": 0.2266,
+      "llm_ttft": 2.0224,
+      "tts_ttfb": null,
+      "transcript": "Text Alex, I'll be there in five.",
+      "context_tokens": 1684,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_talking_to_other_25",
+      "run": 1,
+      "clip": "phrase_v15_talking_to_other_25",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 3.3056,
+      "e2e_source": "marks",
+      "e2e_heard": 4.004,
+      "endpointing": 0.5592,
+      "asr_final": 0.2783,
+      "llm_ttft": 2.9781,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1606,
+      "context_messages": 8,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_talking_to_other_47",
+      "run": 1,
+      "clip": "phrase_v15_talking_to_other_47",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 1.698,
+      "e2e_source": "marks",
+      "e2e_heard": 2.308,
+      "endpointing": 0.5553,
+      "asr_final": 0.2215,
+      "llm_ttft": 1.3482,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1576,
+      "context_messages": 6,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v15_talking_to_other_52",
+      "run": 1,
+      "clip": "phrase_v15_talking_to_other_52",
+      "ref": "How long should I steep green tea?",
+      "e2e": 2.6155,
+      "e2e_source": "marks",
+      "e2e_heard": 3.396,
+      "endpointing": 0.526,
+      "asr_final": 0.2395,
+      "llm_ttft": 1.9551,
+      "tts_ttfb": 0.2823,
+      "transcript": "How long should I steep green tea?",
+      "context_tokens": 1689,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v1_interrupt_174",
+      "run": 1,
+      "clip": "phrase_v1_interrupt_174",
+      "ref": "How can I protect my online accounts?",
+      "e2e": 2.6879,
+      "e2e_source": "marks",
+      "e2e_heard": 3.524,
+      "endpointing": 0.5556,
+      "asr_final": 0.2377,
+      "llm_ttft": 2.156,
+      "tts_ttfb": 0.2761,
+      "transcript": "How can I protect my online account?",
+      "context_tokens": 1685,
+      "context_messages": 12,
+      "wer": 0.14285714285714285,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 1,
+        "wer": 0.14285714285714285
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r01_stage_latency_phrase_v1_interrupt_52",
+      "run": 1,
+      "clip": "phrase_v1_interrupt_52",
+      "ref": "What kind of movies do you think I would like?",
+      "e2e": 2.1181,
+      "e2e_source": "marks",
+      "e2e_heard": 2.788,
+      "endpointing": 0.5531,
+      "asr_final": 0.2187,
+      "llm_ttft": 1.5671,
+      "tts_ttfb": 0.2966,
+      "transcript": "What kind of movies do you think I would like",
+      "context_tokens": 1526,
+      "context_messages": 4,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 10,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_backchannel_11",
+      "run": 2,
+      "clip": "phrase_v15_backchannel_11",
+      "ref": "Summarize black holes comprehensively.",
+      "e2e": 3.1888,
+      "e2e_source": "marks",
+      "e2e_heard": 5.028,
+      "endpointing": 0.5564,
+      "asr_final": 0.2903,
+      "llm_ttft": 2.5332,
+      "tts_ttfb": 0.2906,
+      "transcript": "Summarize black holes comprehensively.",
+      "context_tokens": 1655,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_backchannel_51",
+      "run": 2,
+      "clip": "phrase_v15_backchannel_51",
+      "ref": "Describe tsunamis comprehensively.",
+      "e2e": 2.7802,
+      "e2e_source": "marks",
+      "e2e_heard": 3.62,
+      "endpointing": 0.5588,
+      "asr_final": 0.1929,
+      "llm_ttft": 2.1763,
+      "tts_ttfb": 0.2919,
+      "transcript": "Describe tsunamis comprehensively.",
+      "context_tokens": 1651,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 3,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_backchannel_90",
+      "run": 2,
+      "clip": "phrase_v15_backchannel_90",
+      "ref": "Discuss moral dilemmas fully.",
+      "e2e": 5.992,
+      "e2e_source": "marks",
+      "e2e_heard": 6.596,
+      "endpointing": 0.5272,
+      "asr_final": 0.2311,
+      "llm_ttft": 4.7867,
+      "tts_ttfb": 0.6457,
+      "transcript": "Discuss moral dilemmas fully.",
+      "context_tokens": 1263,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_background_29",
+      "run": 2,
+      "clip": "phrase_v15_background_29",
+      "ref": "When is the next full moon?",
+      "e2e": 1.8893,
+      "e2e_source": "marks",
+      "e2e_heard": 2.564,
+      "endpointing": 0.5597,
+      "asr_final": 0.2287,
+      "llm_ttft": 1.5937,
+      "tts_ttfb": null,
+      "transcript": "When is the next full moon?",
+      "context_tokens": 1671,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 6,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_background_70",
+      "run": 2,
+      "clip": "phrase_v15_background_70",
+      "ref": "Text Alex 'I'll be there in five'.",
+      "e2e": 2.2519,
+      "e2e_source": "marks",
+      "e2e_heard": 3.236,
+      "endpointing": 0.5674,
+      "asr_final": 0.2492,
+      "llm_ttft": 1.4735,
+      "tts_ttfb": null,
+      "transcript": "Text Alex, I'll be there in five.",
+      "context_tokens": 1649,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_talking_to_other_25",
+      "run": 2,
+      "clip": "phrase_v15_talking_to_other_25",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 2.6514,
+      "e2e_source": "marks",
+      "e2e_heard": 3.332,
+      "endpointing": 0.5663,
+      "asr_final": 0.2885,
+      "llm_ttft": 2.2233,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1661,
+      "context_messages": 12,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_talking_to_other_47",
+      "run": 2,
+      "clip": "phrase_v15_talking_to_other_47",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 1.6386,
+      "e2e_source": "marks",
+      "e2e_heard": 2.5,
+      "endpointing": 0.5632,
+      "asr_final": 0.282,
+      "llm_ttft": 1.257,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1668,
+      "context_messages": 12,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v15_talking_to_other_52",
+      "run": 2,
+      "clip": "phrase_v15_talking_to_other_52",
+      "ref": "How long should I steep green tea?",
+      "e2e": 2.3481,
+      "e2e_source": "marks",
+      "e2e_heard": 2.948,
+      "endpointing": 0.5255,
+      "asr_final": 0.2391,
+      "llm_ttft": 1.6817,
+      "tts_ttfb": 0.2971,
+      "transcript": "How long should I steep green tea?",
+      "context_tokens": 1672,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v1_interrupt_174",
+      "run": 2,
+      "clip": "phrase_v1_interrupt_174",
+      "ref": "How can I protect my online accounts?",
+      "e2e": 1.8073,
+      "e2e_source": "marks",
+      "e2e_heard": 2.66,
+      "endpointing": 0.5537,
+      "asr_final": 0.2393,
+      "llm_ttft": 1.2116,
+      "tts_ttfb": 0.2903,
+      "transcript": "How can I protect my online account?",
+      "context_tokens": 1670,
+      "context_messages": 12,
+      "wer": 0.14285714285714285,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 1,
+        "wer": 0.14285714285714285
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r02_stage_latency_phrase_v1_interrupt_52",
+      "run": 2,
+      "clip": "phrase_v1_interrupt_52",
+      "ref": "What kind of movies do you think I would like?",
+      "e2e": 1.9551,
+      "e2e_source": "marks",
+      "e2e_heard": 2.82,
+      "endpointing": 0.5564,
+      "asr_final": 0.2876,
+      "llm_ttft": 1.1806,
+      "tts_ttfb": 0.2878,
+      "transcript": "What kind of movies do you think I would like?",
+      "context_tokens": 1663,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 10,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_backchannel_11",
+      "run": 3,
+      "clip": "phrase_v15_backchannel_11",
+      "ref": "Summarize black holes comprehensively.",
+      "e2e": 2.4979,
+      "e2e_source": "marks",
+      "e2e_heard": 3.3,
+      "endpointing": 0.5668,
+      "asr_final": 0.2653,
+      "llm_ttft": 1.9108,
+      "tts_ttfb": 0.267,
+      "transcript": "Summarize black holes comprehensively.",
+      "context_tokens": 1666,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_backchannel_51",
+      "run": 3,
+      "clip": "phrase_v15_backchannel_51",
+      "ref": "Describe tsunamis comprehensively.",
+      "e2e": 3.7864,
+      "e2e_source": "marks",
+      "e2e_heard": 4.516,
+      "endpointing": 0.5524,
+      "asr_final": 0.2382,
+      "llm_ttft": 3.1676,
+      "tts_ttfb": 0.2887,
+      "transcript": "Describe tsunamis comprehensively.",
+      "context_tokens": 1664,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 3,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_backchannel_90",
+      "run": 3,
+      "clip": "phrase_v15_backchannel_90",
+      "ref": "Discuss moral dilemmas fully.",
+      "e2e": 3.1286,
+      "e2e_source": "marks",
+      "e2e_heard": 3.78,
+      "endpointing": 0.5339,
+      "asr_final": 0.2843,
+      "llm_ttft": 2.1942,
+      "tts_ttfb": 0.358,
+      "transcript": "Discuss moral dilemmas fully.",
+      "context_tokens": 1661,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 4,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_background_29",
+      "run": 3,
+      "clip": "phrase_v15_background_29",
+      "ref": "When is the next full moon?",
+      "e2e": 2.2597,
+      "e2e_source": "marks",
+      "e2e_heard": 3.204,
+      "endpointing": 0.558,
+      "asr_final": 0.3999,
+      "llm_ttft": 1.8546,
+      "tts_ttfb": null,
+      "transcript": "When is the next full moon?",
+      "context_tokens": 1666,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 6,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_background_70",
+      "run": 3,
+      "clip": "phrase_v15_background_70",
+      "ref": "Text Alex 'I'll be there in five'.",
+      "e2e": 1.9724,
+      "e2e_source": "marks",
+      "e2e_heard": 2.628,
+      "endpointing": 0.5721,
+      "asr_final": 0.2881,
+      "llm_ttft": 1.5935,
+      "tts_ttfb": null,
+      "transcript": "Text Alex, I'll be there in five.",
+      "context_tokens": 1678,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_talking_to_other_25",
+      "run": 3,
+      "clip": "phrase_v15_talking_to_other_25",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 3.4677,
+      "e2e_source": "marks",
+      "e2e_heard": 4.324,
+      "endpointing": 0.5601,
+      "asr_final": 0.2749,
+      "llm_ttft": 3.1618,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1675,
+      "context_messages": 12,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_talking_to_other_47",
+      "run": 3,
+      "clip": "phrase_v15_talking_to_other_47",
+      "ref": "Set an alarm for 6:30 AM on weekdays.",
+      "e2e": 1.3828,
+      "e2e_source": "marks",
+      "e2e_heard": 2.02,
+      "endpointing": 0.5589,
+      "asr_final": 0.2749,
+      "llm_ttft": 1.0281,
+      "tts_ttfb": null,
+      "transcript": "Set an alarm for 06:30AM on weekdays.",
+      "context_tokens": 1684,
+      "context_messages": 12,
+      "wer": 0.3333333333333333,
+      "wer_detail": {
+        "ref_words": 9,
+        "edits": 3,
+        "wer": 0.3333333333333333
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v15_talking_to_other_52",
+      "run": 3,
+      "clip": "phrase_v15_talking_to_other_52",
+      "ref": "How long should I steep green tea?",
+      "e2e": 1.6355,
+      "e2e_source": "marks",
+      "e2e_heard": 2.532,
+      "endpointing": 0.5191,
+      "asr_final": 0.2296,
+      "llm_ttft": 1.0563,
+      "tts_ttfb": 0.2638,
+      "transcript": "How long should I steep green tea?",
+      "context_tokens": 1669,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v1_interrupt_174",
+      "run": 3,
+      "clip": "phrase_v1_interrupt_174",
+      "ref": "How can I protect my online accounts?",
+      "e2e": 3.5477,
+      "e2e_source": "marks",
+      "e2e_heard": 4.42,
+      "endpointing": 0.563,
+      "asr_final": 0.2434,
+      "llm_ttft": 2.9427,
+      "tts_ttfb": 0.2761,
+      "transcript": "Protect my online account.",
+      "context_tokens": 1668,
+      "context_messages": 12,
+      "wer": 0.5714285714285714,
+      "wer_detail": {
+        "ref_words": 7,
+        "edits": 4,
+        "wer": 0.5714285714285714
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    },
+    {
+      "trial": "r03_stage_latency_phrase_v1_interrupt_52",
+      "run": 3,
+      "clip": "phrase_v1_interrupt_52",
+      "ref": "What kind of movies do you think I would like?",
+      "e2e": 3.5424,
+      "e2e_source": "marks",
+      "e2e_heard": 4.42,
+      "endpointing": 0.5771,
+      "asr_final": 0.2403,
+      "llm_ttft": 2.9229,
+      "tts_ttfb": 0.2972,
+      "transcript": "What kind of movies do you think I would like",
+      "context_tokens": 1684,
+      "context_messages": 12,
+      "wer": 0.0,
+      "wer_detail": {
+        "ref_words": 10,
+        "edits": 0,
+        "wer": 0.0
+      },
+      "found": [
+        "vad_end",
+        "asr_final",
+        "llm_request",
+        "llm_first_token",
+        "tts_request",
+        "tts_first_audio",
+        "audio_out"
+      ]
+    }
+  ],
+  "per_run": {
+    "1": {
+      "e2e": {
+        "n": 10,
+        "median": 2.6517,
+        "p95": 3.709134999999999,
+        "mean": 2.62769,
+        "min": 1.4745,
+        "max": 4.0393,
+        "ci95_median": [
+          2.01815,
+          3.1252500000000003
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "asr_final": {
+        "n": 10,
+        "median": 0.236,
+        "p95": 0.298085,
+        "mean": 0.24825,
+        "min": 0.2187,
+        "max": 0.3083,
+        "ci95_median": [
+          0.2266,
+          0.2783
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "llm_ttft": {
+        "n": 10,
+        "median": 2.0892,
+        "p95": 3.1785199999999993,
+        "mean": 2.14133,
+        "min": 1.1705,
+        "max": 3.3425,
+        "ci95_median": [
+          1.5671,
+          2.6896
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "tts_ttfb": {
+        "n": 6,
+        "median": 0.28090000000000004,
+        "p95": 0.293975,
+        "mean": 0.2805,
+        "min": 0.2624,
+        "max": 0.2966,
+        "ci95_median": [
+          0.26925,
+          0.29135
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      }
+    },
+    "2": {
+      "e2e": {
+        "n": 10,
+        "median": 2.3,
+        "p95": 4.730559999999997,
+        "mean": 2.65027,
+        "min": 1.6386,
+        "max": 5.992,
+        "ci95_median": [
+          1.8812,
+          2.9201
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "asr_final": {
+        "n": 10,
+        "median": 0.24425000000000002,
+        "p95": 0.28948999999999997,
+        "mean": 0.25287,
+        "min": 0.1929,
+        "max": 0.2903,
+        "ci95_median": [
+          0.2311,
+          0.2876
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "llm_ttft": {
+        "n": 10,
+        "median": 1.6377,
+        "p95": 3.7726249999999975,
+        "mean": 2.01176,
+        "min": 1.1806,
+        "max": 4.7867,
+        "ci95_median": [
+          1.257,
+          2.35475
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "tts_ttfb": {
+        "n": 6,
+        "median": 0.29125,
+        "p95": 0.55855,
+        "mean": 0.3505666666666667,
+        "min": 0.2878,
+        "max": 0.6457,
+        "ci95_median": [
+          0.28905000000000003,
+          0.47140000000000004
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      }
+    },
+    "3": {
+      "e2e": {
+        "n": 10,
+        "median": 2.81325,
+        "p95": 3.6789849999999995,
+        "mean": 2.72211,
+        "min": 1.3828,
+        "max": 3.7864,
+        "ci95_median": [
+          1.9724,
+          3.5424
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "asr_final": {
+        "n": 10,
+        "median": 0.2701,
+        "p95": 0.3495899999999999,
+        "mean": 0.27388999999999997,
+        "min": 0.2296,
+        "max": 0.3999,
+        "ci95_median": [
+          0.2403,
+          0.2862
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "llm_ttft": {
+        "n": 10,
+        "median": 2.0525,
+        "p95": 3.16499,
+        "mean": 2.18325,
+        "min": 1.0281,
+        "max": 3.1676,
+        "ci95_median": [
+          1.59075125,
+          3.04235
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      },
+      "tts_ttfb": {
+        "n": 6,
+        "median": 0.2824,
+        "p95": 0.3428,
+        "mean": 0.2918,
+        "min": 0.2638,
+        "max": 0.358,
+        "ci95_median": [
+          0.26539999999999997,
+          0.3276
+        ],
+        "p95_note": "with fewer than 20 trials p95 is close to the slowest trial"
+      }
+    }
+  }
+}
