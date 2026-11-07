@@ -410,6 +410,7 @@
       feed.appendChild(turnBlock(e.side, e.text, e.dim, e.kind, e.anno));
     }
     rendered = entries.length;
+    if (liveEl && newCount > 0) feed.appendChild(liveEl);   /* live turn stays last */
     if (nearBottom) feed.scrollTop = feed.scrollHeight;   /* don't yank if reading up */
     if (newCount > 0 && entries.length) {
       var last = entries[entries.length - 1];
@@ -741,6 +742,38 @@
   }
   poll();
   setInterval(poll, 1000);
+
+  /* ---------- live transcript: the turn in progress ----------
+     /api/live = what Deepgram hears while you talk, then Watson's sentences
+     as they go to the voice. The finished turn replaces it in the feed. */
+  var liveEl = null;
+  var LIVE_MAX_AGE = { hearing: 4, thinking: 6, speaking: 30 };
+  function renderLive(v) {
+    var age = (v.now || 0) - (v.t || 0);
+    var active = v.phase && LIVE_MAX_AGE[v.phase] != null && age < LIVE_MAX_AGE[v.phase]
+      && (v.you || v.watson);
+    if (!active) {
+      if (liveEl) { liveEl.remove(); liveEl = null; }
+      return;
+    }
+    var nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
+    if (!liveEl) { liveEl = document.createElement("div"); liveEl.className = "live-turn"; }
+    liveEl.innerHTML = "";
+    var hearing = v.phase === "hearing";
+    if (v.you) liveEl.appendChild(turnBlock("u", v.you, hearing, hearing ? "live" : null, null));
+    if (v.watson) liveEl.appendChild(turnBlock("w", v.watson, false, "tts", null));
+    var utts = liveEl.querySelectorAll(".utt");
+    if (utts.length) utts[utts.length - 1].classList.add("caret");
+    if (feed.lastChild !== liveEl) feed.appendChild(liveEl);
+    var empty = document.getElementById("conv-empty");
+    if (empty) empty.remove();
+    if (nearBottom) feed.scrollTop = feed.scrollHeight;
+  }
+  function pollLive() {
+    fetch("/api/live").then(function (r) { return r.json(); })
+      .then(renderLive).catch(function () {});
+  }
+  setInterval(pollLive, 250);
 })();
 </script>
 </body>

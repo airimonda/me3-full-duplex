@@ -934,6 +934,8 @@ class WatsonAgent(FrameProcessor):
         from pipecat.frames.frames import OutputAudioRawFrame
         text = await self._asr_utterance(utt_pcm, live)
         mark("asr_final", text=text or "")
+        if self.mode == "mic" and text:
+            self._live_view(you=text, phase="thinking")
         t_asr = time.perf_counter()
         if not text or len(text.strip()) < 2:
             return
@@ -1246,6 +1248,7 @@ class WatsonAgent(FrameProcessor):
                     chunk_text, buf = buf[:m + 1], buf[m + 1:]
                     if chunk_text.strip() and out is not None:
                         out.say(chunk_text.strip())
+                        self._live_say(chunk_text.strip())
                     elif chunk_text.strip():
                         wav = await self._speak(chunk_text.strip())
                         if wav and self.gen == gen:
@@ -1257,6 +1260,7 @@ class WatsonAgent(FrameProcessor):
                         break  # bench cap: don't let playback bleed into the next trial
             if buf.strip() and not delegate_rest and self.gen == gen and out is not None:
                 out.say(buf.strip())
+                self._live_say(buf.strip())
             elif buf.strip() and not delegate_rest and self.gen == gen:
                 wav = await self._speak(buf.strip())
                 if wav:
@@ -1346,6 +1350,8 @@ class WatsonAgent(FrameProcessor):
                     self.answer_until = time.monotonic() + _ANSWER_WINDOW_S
             ft = max(0.0, (first_token or t_asr) - t0)
             fa = max(0.0, first_audio - t0) if first_audio is not None else total
+            if self.mode == "mic":
+                self._live_view(phase="done")
             self.log_event("turn", user=text, reply=reply,
                            asr_s=round(t_asr - t0, 3),
                            first_token_s=round(ft, 3),
@@ -1371,9 +1377,38 @@ class WatsonAgent(FrameProcessor):
                 live.cancel()
             live = _DGLive(self)
         self.asr_live = live
+        if self.mode == "mic":
+            self._live_view(you="", watson="", phase="hearing")
+            live.on_text = lambda text: self._live_view(you=text, phase="hearing")
         if first:
             live.feed(first)
         self.asr_spare = _DGLive(self)   # ready for the next utterance
+
+    def _live_view(self, you=None, watson=None, phase=None):
+        """Mic mode: the in-progress turn for the Watson UI's live transcript
+        (runs/live/live.json, replaced atomically; ui_server /api/live)."""
+        v = getattr(self, "_live_state", None) or {"you": "", "watson": "", "phase": "idle"}
+        if you is not None:
+            v["you"] = you
+        if watson is not None:
+            v["watson"] = watson
+        if phase is not None:
+            v["phase"] = phase
+        v["t"] = time.time()
+        self._live_state = v
+        try:
+            tmp = self.log_dir / "live.json.tmp"
+            tmp.write_text(json.dumps(v))
+            os.replace(tmp, self.log_dir / "live.json")
+        except Exception:
+            pass
+
+    def _live_say(self, sentence: str):
+        if self.mode != "mic":
+            return
+        prev = (getattr(self, "_live_state", None) or {}).get("watson", "")
+        self._live_view(watson=(prev + " " + (self.chatbrain.speakable(sentence) or "")).strip(),
+                        phase="speaking")
 
     def _live_feed(self, pcm: bytes):
         if self.asr_live is not None:
@@ -1658,6 +1693,7 @@ class _DGLive:
         self.err = None
         self.t_finish = None
         self.t_done = None
+        self.on_text = None   # called with the words so far (interim + final)
         self.task = asyncio.create_task(self._run())
 
     def feed(self, pcm: bytes):
@@ -1690,7 +1726,9 @@ class _DGLive:
         from urllib.parse import urlencode
         q = [("model", DG_ASR_MODEL), ("language", "en"), ("smart_format", "true"),
              ("encoding", "linear16"), ("sample_rate", str(_IN_SR)), ("channels", "1"),
-             ("interim_results", "false")]
+             # interim words feed the Watson UI's live transcript (mic only;
+             # bench stays final-only)
+             ("interim_results", "true" if self.a.mode == "mic" else "false")]
         q += [("keyterm", k) for k in DG_KEYTERMS]
         return "wss://api.deepgram.com/v1/listen?" + urlencode(q)
 
@@ -1715,11 +1753,17 @@ class _DGLive:
                             continue
                         if d.get("type") != "Results":
                             continue
+                        alt = (d.get("channel") or {}).get("alternatives") or [{}]
+                        t = (alt[0].get("transcript") or "").strip()
                         if d.get("is_final"):
-                            alt = (d.get("channel") or {}).get("alternatives") or [{}]
-                            t = (alt[0].get("transcript") or "").strip()
                             if t:
                                 self.finals.append(t)
+                        if self.on_text is not None and self.t_finish is None:
+                            partial = [] if d.get("is_final") or not t else [t]
+                            try:
+                                self.on_text(" ".join(self.finals + partial))
+                            except Exception:
+                                pass
                         # do NOT stop at the first from_finalize result: more
                         # final results can follow it (full bench 08-16-56 lost
                         # trailing words: "Text Alex. I'll be"). The server
