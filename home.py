@@ -70,19 +70,38 @@ def _pi_device():
     return dev, h
 
 
-def _pi_call(method, path, json_body=None, **params):
-    """Web API player call on the Pi's device. Returns (ok, error text)."""
+def _pi_call(method, path, json_body=None, retry_s=0.0, **params):
+    """Web API player call on the Pi's device. Returns (ok, error text).
+    retry_s: keep retrying 403 "Restriction violated" / 404 / 5xx that long;
+    right after a hand-over or a fresh librespot start Spotify answers those
+    for a few seconds (vcm-me2 finding)."""
     dev, h = _pi_device()
     if not dev:
-        return False, _NO_PI
-    r = httpx.request(method, f"{SPOTIFY_API}/me/player/{path}",
-                      params={"device_id": dev, **params}, json=json_body,
-                      headers=h, timeout=10)
-    if r.status_code in (200, 202, 204):
-        _status_cache["t"] = 0.0   # refresh the UI's view right away
-        return True, ""
-    _dev_cache["id"] = None        # device may have gone; look it up again next time
-    return False, f"Spotify answered {r.status_code}"
+        _dev_cache["id"] = None
+        dev, h = _pi_device()      # look it up once more, bypassing the cache
+        if not dev:
+            return False, _NO_PI
+    deadline = time.time() + retry_s
+    while True:
+        r = httpx.request(method, f"{SPOTIFY_API}/me/player/{path}",
+                          params={"device_id": dev, **params}, json=json_body,
+                          headers=h, timeout=10)
+        if r.status_code in (200, 202, 204):
+            _status_cache["t"] = 0.0   # refresh the UI's view right away
+            return True, ""
+        if r.status_code in (403, 404, 500, 502, 503) and time.time() < deadline:
+            time.sleep(1.0)
+            continue
+        _dev_cache["id"] = None        # device may have gone; look it up again next time
+        return False, f"Spotify answered {r.status_code}"
+
+
+def _liked_songs_uri():
+    """The user's Liked Songs as a playable context (vcm-me2 default)."""
+    h = _sp_headers()
+    r = httpx.get(f"{SPOTIFY_API}/me", headers=h, timeout=10) if h else None
+    uid = r.json().get("id") if r is not None and r.status_code == 200 else None
+    return f"spotify:user:{uid}:collection" if uid else None
 
 
 _status_cache = {"v": None, "t": 0.0}
@@ -237,19 +256,32 @@ def _virtual_note(query):
     _save_state(st)
 
 
+_GENERIC_MUSIC = {"", "music", "some music", "a song", "something", "anything", "spotify"}
+
+
 def spotify_play(query):
+    if not _ON_MAC and (query or "").strip().lower() in _GENERIC_MUSIC:
+        # "play music": the user's Liked Songs on shuffle (vcm-me2 default)
+        ctx = _liked_songs_uri()
+        ok, err = _pi_call("PUT", "play", json_body={"context_uri": ctx} if ctx else None,
+                           retry_s=6.0)
+        if ok:
+            _pi_call("PUT", "shuffle", state="true")   # after play: a fresh device rejects it before
+            _player(state="playing", query="Liked Songs", since=time.time())
+            return "Playing your Liked Songs on Spotify."
+        return f"I couldn't play music: {err}."
     item = spotify_search(query)
     if not _ON_MAC:
         if item:
             name = item.get("name", query)
             artist = (item.get("artists") or [{}])[0].get("name", "")
-            ok, err = _pi_call("PUT", "play", json_body={"uris": [item.get("uri")]})
+            ok, err = _pi_call("PUT", "play", json_body={"uris": [item.get("uri")]}, retry_s=6.0)
             if ok:
                 _player(state="playing", query=f"{name} - {artist}" if artist else name,
                         since=time.time())
                 return f"Playing {name} by {artist} on Spotify."
             return f"I found {name} by {artist}, but couldn't play it: {err}."
-        ok, err = _pi_call("PUT", "play")   # nothing found: resume
+        ok, err = _pi_call("PUT", "play", retry_s=6.0)   # nothing found: resume
         return "Playing music on Spotify." if ok else f"I couldn't play music: {err}."
     if not item:
         # no API search (no creds at all) — still try direct AppleScript play
