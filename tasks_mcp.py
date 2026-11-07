@@ -14,7 +14,8 @@ Tools
                         the results in the Mac browser and returns snippets
 
 Run (Pi):  ~/mcp-venv/bin/python ~/me3/tasks_mcp.py   # http://127.0.0.1:8320/mcp
-Env: ME3_TASKS_MCP_PORT (8320), ME3_BROWSE_OPEN=1 to also show searches on screen.
+Env: ME3_TASKS_MCP_PORT (8320), ME3_BROWSE_OPEN=1 to also show searches on screen,
+ME3_PAGES_REPO + ME3_PAGES_URL to publish finished pages to GitHub Pages.
 """
 from __future__ import annotations
 
@@ -59,9 +60,35 @@ def _watch(poll_s: float = 1.0):
                                       "t": time.time()})
                     log(f"finished {tid} status={f.get('status')} "
                         f"opened={bool(opened)} line={line!r}")
+                    if tasks.PAGES_REPO and f.get("status") == "done" and f.get("files"):
+                        threading.Thread(target=_publish, args=(tid,), daemon=True).start()
         except Exception as e:  # never let the watcher die
             log("watch error:", repr(e))
         time.sleep(poll_s)
+
+
+def _publish(tid: str):
+    """Push the page to GitHub Pages (git can take seconds: off the watcher
+    and off the lock), then, once github.io serves it, show the public link
+    on the Mac and queue a second spoken line."""
+    try:
+        url = tasks.publish(tid)
+        log(f"publish {tid} url={url}")
+        if not url:
+            return
+        live = tasks.wait_live(url)
+        log(f"publish {tid} live={live}")
+        if not live:
+            return
+        tasks.open_url(url)
+        thing = tasks._thing(tasks._finished.get(tid, {}).get("prompt", ""))
+        with _lock:
+            _announce.append({"id": tid, "status": "published", "opened": True,
+                              "line": speakable(f"{thing[:1].upper() + thing[1:]} "
+                                                "is live on the web now."),
+                              "t": time.time()})
+    except Exception as e:
+        log("publish error:", repr(e))
 
 
 def submit(request: str) -> dict:

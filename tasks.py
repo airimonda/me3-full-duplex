@@ -273,6 +273,78 @@ def open_deliverable(tid):
         return None
 
 
+# GitHub Pages (Nov 7, owner request): a finished page is copied into a
+# local clone of the Pages repo and pushed, so it gets a public github.io
+# address. Runs here, OUTSIDE the sandbox: the agent never sees git or the
+# deploy key (~/.ssh/watson_sites, write access to that one repo only).
+# Off unless ME3_PAGES_REPO points at the clone.
+PAGES_REPO = os.path.expanduser(os.environ.get("ME3_PAGES_REPO", "").strip())
+PAGES_URL = os.environ.get("ME3_PAGES_URL", "").strip().rstrip("/")
+_INDEX_MARK = "<!-- tasks -->"
+
+
+def _git(*args, timeout=60):
+    return subprocess.run(["git", "-C", PAGES_REPO, *args], capture_output=True,
+                          text=True, timeout=timeout)
+
+
+def publish(tid):
+    """Push a finished task's page to GitHub Pages. Returns its public URL,
+    or None (not configured, nothing to publish, or git failed)."""
+    f = _finished.get(tid)
+    if not (PAGES_REPO and PAGES_URL and f and f["status"] == "done"):
+        return None
+    html = [n for n in f["files"] if n.lower().endswith((".html", ".htm"))]
+    if not html:
+        return None
+    main = "index.html" if "index.html" in html else sorted(html)[0]
+    slug = time.strftime("%m%d-%H%M") + "-" + tid      # task ids restart after a reset
+    dest = os.path.join(PAGES_REPO, slug)
+    os.makedirs(dest, exist_ok=True)
+    for name in f["files"]:
+        shutil.copy2(os.path.join(f["dir"], name), os.path.join(dest, name))
+    url = f"{PAGES_URL}/{slug}/" + ("" if main == "index.html" else main)
+    idx = os.path.join(PAGES_REPO, "index.html")
+    try:
+        page = open(idx).read()
+        if _INDEX_MARK in page:
+            import html as _h
+            title = _thing(f.get("prompt", ""))
+            item = (f'<li><a href="{slug}/{"" if main == "index.html" else main}">'
+                    f'{_h.escape(title[:1].upper() + title[1:])}</a> '
+                    f'({time.strftime("%b %d, %H:%M")})</li>')
+            open(idx, "w").write(page.replace(_INDEX_MARK, _INDEX_MARK + "\n" + item, 1))
+    except OSError:
+        pass
+    try:
+        _git("add", "-A")
+        c = _git("commit", "-q", "-m", f"{slug}: {_shorten(f.get('prompt', ''), 60)}")
+        p = _git("push", "-q", "origin", "HEAD:main", timeout=90)
+    except subprocess.TimeoutExpired:
+        print(f"[tasks] publish {tid}: git timed out", flush=True)
+        return None
+    if c.returncode != 0 or p.returncode != 0:
+        print(f"[tasks] publish {tid} failed: {(c.stderr + p.stderr).strip()[:300]}", flush=True)
+        return None
+    f["url"] = url
+    return url
+
+
+def wait_live(url, limit_s=240, every_s=5):
+    """True once the Pages URL serves 200 (a new page takes ~30-90 s)."""
+    import urllib.request
+    t0 = time.time()
+    while time.time() - t0 < limit_s:
+        try:
+            with urllib.request.urlopen(url, timeout=10) as r:
+                if r.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(every_s)
+    return False
+
+
 def list_running():
     return {tid: status_summary(tid) for tid in _running}
 
