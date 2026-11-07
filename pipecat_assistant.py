@@ -1345,7 +1345,7 @@ class WatsonAgent(FrameProcessor):
                     # is a reply, not a fragment (Nov 6: "halo-halo" dropped)
                     self.answer_until = time.monotonic() + _ANSWER_WINDOW_S
             ft = max(0.0, (first_token or t_asr) - t0)
-            fa = max(0.0, (first_audio if first_audio is not None else total) - t0)
+            fa = max(0.0, first_audio - t0) if first_audio is not None else total
             self.log_event("turn", user=text, reply=reply,
                            asr_s=round(t_asr - t0, 3),
                            first_token_s=round(ft, 3),

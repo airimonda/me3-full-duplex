@@ -1,5 +1,8 @@
 # Watson: A Full-Duplex Voice Agent with Echo-Aware Interruption Handling and Delegated Task Execution
 
+> **Nov 7 update:** sections 1–7 describe the Mac system frozen at run 16 (Oct 30). Watson now runs on a
+> Raspberry Pi with Deepgram ASR/TTS and glm-5.3-flash, all streamed; see section 8 and `RESULTS.md`.
+
 *AI 231 class project — ME3. Author: A. Mondares. Code frozen at run 16 (2026-10-30). Companion repo: `airimonda/me3-full-duplex`; benchmark harness: `trueshotjames/ai231-me3-full-duplex-benchmarking` (Full-Duplex-Bench v1 sampled + v3 reduced).*
 
 ## Abstract
@@ -159,3 +162,29 @@ Run 16 artifacts: `results/run16-2026-10-30/` (results.json/csv/html, harness lo
 agent turn log). The agent log records every gate decision (`stranger_ignored`,
 `echo_ignored`, `probe_resume`, `barge_in`, `superseded`, `delegated`, `tool`),
 so each verdict can be traced to a concrete policy decision.
+
+## 8. Update (Nov 7, 2026): the Pi deployment and streaming
+
+The voice front-end and the agent now run on a Raspberry Pi 4 (4 GB, no fan). ASR and TTS moved to
+Deepgram (nova-3, aura-2-jupiter-en) called from the Pi; the talker is `z-ai/glm-5.3-flash` via
+OpenRouter with `gpt-4o-mini` as fallback; big tasks go to a task MCP server on the Pi that runs the
+pi.dev agent under bubblewrap. Echo is rejected by speaker identity rather than waveform correlation,
+because on the Pi's open speaker the echo is as loud as the owner and correlates poorly.
+
+Four latency changes, each A/B-tested on the Pi with fdbench's stage-latency test:
+
+1. **Streaming TTS.** Deepgram's raw PCM is played as it arrives, and the next sentence is synthesized
+   while the current one plays (TTS first audio 1.45 → 0.29 s median).
+2. **Streaming ASR.** A Deepgram live websocket, opened in advance and kept alive, is fed while the user
+   talks; Finalize + CloseStream at the VAD endpoint returns the transcript ~0.25 s later (0.92 → 0.24 s).
+   Two bugs surfaced on the way: stopping at the first `from_finalize` result dropped trailing words, and
+   a socket opened at speech onset made Deepgram trail the audio by 0.4–1.0 s.
+3. **True LLM streaming.** The talker request used `httpx.post`, which downloads the whole response
+   before returning; reading the stream as it arrives cut the first-token tail (p95 4.28 → 3.26 s).
+4. **Tool turns.** A cached "One sec." plays while tools and the second LLM pass run.
+
+Full run on the Pi (`results/run-2026-11-07-pi/`): end of speech to Watson's audio 2.56 s median,
+3.93 s p95 (Nov 6: 4.72 / 7.49 s), WER 12.1 %, pause take-overs 0/4, interruptions handled 2/2
+(judge 5.0/5), false turns 0/4, turn-taking missed 1/2. The language model's first token (≈2 s median)
+is now most of the remaining wait. Context per call, measured by fdbench from OpenRouter's usage
+report: 1,670 prompt tokens median, 12 messages.

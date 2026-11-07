@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Watson</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='9' fill='%23141311'/%3E%3Cg stroke='%23d9825f' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='13' x2='10' y2='19'/%3E%3Cline x1='16' y1='9' x2='16' y2='23'/%3E%3Cline x1='22' y1='12' x2='22' y2='20'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  /* Watson — full-duplex voice console, dark editorial.
+     Palette: warm charcoal + cream ink + coral accent (Watson's voice).
+     Serif display for headlines and utterances; mono for labels & numbers. */
+  :root {
+    --bg: #141311;
+    --panel: #1d1b18;
+    --panel2: #232019;
+    --deep: #0d0c0a;
+    --ink: #ece7dd;
+    --ink2: #a29c8f;
+    --ink3: #6d675c;
+    --hairline: rgba(236,231,221,.09);
+    --wash: rgba(236,231,221,.05);
+    --coral: #d9825f;
+    --coral-soft: rgba(217,130,95,.14);
+    --cream: #f3efe6;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --serif: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    font-size: 13.5px; line-height: 1.5;
+    background: var(--bg); color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;               /* the page never scrolls — panels do */
+  }
+  .wrap {
+    max-width: 1240px; margin: 0 auto; padding: 0 20px 20px;
+    height: 100%; display: flex; flex-direction: column;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 16px 2px 14px; }
+  .brand { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+  .brand-sub { font-size: 12px; color: var(--ink3); margin-left: 2px; }
+  .spacer { flex: 1; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; color: var(--ink2);
+    background: var(--panel); border: 1px solid var(--hairline);
+    padding: 5px 12px; border-radius: 100px;
+  }
+  .chip i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .chip i.ok { background: var(--coral); }
+  .chip i.off { background: var(--ink3); }
+
+  /* ---------- layout: viewport-fixed, internal scrolling ---------- */
+  .grid { flex: 1; min-height: 0; display: flex; gap: 14px; }
+  .main-col { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+  .rail { flex: 0 0 300px; min-height: 0; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .card {
+    background: var(--panel); border: 1px solid var(--hairline); border-radius: 16px;
+    padding: 18px 20px;
+  }
+  .hero-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #home-panel { flex: none; }
+  .topbar { flex: none; }
+  .card-title { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .card-sub { font-size: 11px; color: var(--ink3); font-family: var(--mono); }
+
+  /* ---------- hero ---------- */
+  .hero-head { display: flex; align-items: center; gap: 18px; }
+  .hero-orb {
+    flex: none; width: 64px; height: 64px; border-radius: 50%;
+    background: var(--deep); border: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-orb .bars { display: flex; gap: 3px; align-items: center; height: 26px; }
+  .hero-orb .bars i { width: 3px; border-radius: 2px; background: var(--coral); height: 30%; }
+  .hero-orb.active .bars i { animation: eq 1s ease-in-out infinite; }
+  .hero-orb.active .bars i:nth-child(2) { animation-delay: .1s; }
+  .hero-orb.active .bars i:nth-child(3) { animation-delay: .2s; }
+  .hero-orb.active .bars i:nth-child(4) { animation-delay: .3s; }
+  .hero-orb.active .bars i:nth-child(5) { animation-delay: .4s; }
+  @keyframes eq { 0%,100% { height: 24%; } 50% { height: 92%; } }
+  h1.state { font-family: var(--serif); font-size: 34px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.1; }
+  .hero-sub { font-size: 13px; color: var(--ink2); margin-top: 3px; }
+
+  /* ---------- waveform stage ---------- */
+  .stage {
+    margin-top: 16px; background: var(--deep); border-radius: 14px;
+    padding: 14px 18px 16px; position: relative; overflow: hidden;
+    border: 1px solid rgba(236,231,221,.05);
+  }
+  .stage .lane { display: flex; align-items: center; gap: 2.5px; height: 44px; }
+  .stage .lane + .lane { margin-top: 10px; }
+  .stage .lane i { flex: 1; border-radius: 2px; height: 10%; background: var(--ink3); opacity: .25; transition: height .12s linear; }
+  .lane.you i { background: var(--cream); }
+  .lane.agent i { background: var(--coral); }
+  .lane.live i { opacity: 1; }
+  .lane-tag {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink3); margin-bottom: 4px;
+  }
+  .lane-tag .who { color: var(--ink2); }
+  .barge {
+    position: absolute; top: 14px; right: 18px;
+    font-family: var(--mono); font-size: 10px; color: var(--coral);
+    background: var(--coral-soft); padding: 3px 9px; border-radius: 100px;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  .barge.show { opacity: 1; }
+
+  /* ---------- transcript ---------- */
+  .turn { margin-top: 16px; }
+  .role {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--ink3); margin-bottom: 4px;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .role .kind { color: var(--coral); }
+  .utt { font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--ink); max-width: 60ch; }
+  .turn.dim .utt { color: var(--ink3); }
+  .anno { font-family: var(--mono); font-size: 10px; color: var(--ink3); margin-top: 2px; }
+  .caret::after { content: "▍"; animation: blink 1s steps(1) infinite; color: var(--coral); }
+  @keyframes blink { 50% { opacity: 0; } }
+  .feed { padding-bottom: 6px; flex: 1; min-height: 0; overflow-y: auto; }
+  #conv-empty { text-align: center; padding: 26px 0 10px; color: var(--ink3); }
+  #conv-empty .big { font-family: var(--serif); font-size: 16px; color: var(--ink2); display: block; margin-bottom: 4px; }
+  #conv-empty .hint-k { font-family: var(--mono); font-size: 11px; }
+  #conv-empty .hint-k b { color: var(--ink2); font-weight: 600; background: var(--wash); padding: 1px 6px; border-radius: 4px; }
+
+  /* ---------- home panel ---------- */
+  .home-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; margin-top: 14px; }
+  .hgroup { min-width: 0; }
+  .hgroup + .hgroup { border-left: 1px solid var(--hairline); padding-left: 22px; }
+  .ghead {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink3); margin-bottom: 6px;
+  }
+  @media (max-width: 980px) {
+    .home-grid { grid-template-columns: 1fr; }
+    .hgroup + .hgroup { border-left: none; padding-left: 0; border-top: 1px solid var(--hairline); padding-top: 14px; }
+  }
+  .pill {
+    font-size: 11.5px; color: var(--ink2); background: var(--wash);
+    border: 1px solid var(--hairline); border-radius: 100px; padding: 4px 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .pill.live { color: var(--ink); border-color: rgba(217,130,95,.4); }
+  .pill.live i { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); }
+
+  /* ---------- rail: pipeline ---------- */
+  .pipe-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 10px; margin-top: 6px;
+  }
+  .pipe-row.hl { background: var(--wash); }
+  .pipe-row i { width: 6px; height: 6px; border-radius: 50%; background: var(--coral); flex: none; opacity: 0; }
+  .pipe-row.live i { opacity: 1; }
+  .pipe-name { font-size: 12.5px; font-weight: 600; }
+  .pipe-desc { font-size: 10.5px; color: var(--ink3); }
+  .pipe-val { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink2); text-align: right; }
+  .pipe-val b { display: block; font-size: 12px; color: var(--ink); font-weight: 600; }
+
+  /* ---------- rail: turn-taking stats ---------- */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stat { background: var(--panel2); border-radius: 12px; padding: 10px 12px; }
+  .stat .k { font-size: 10.5px; color: var(--ink2); margin-bottom: 2px; }
+  .stat .v { font-family: var(--serif); font-size: 19px; }
+
+  /* ---------- rail: background task ---------- */
+  .task-name { font-size: 13px; font-weight: 600; margin-top: 8px; }
+  .task-bar { height: 4px; border-radius: 2px; background: var(--wash); margin-top: 8px; overflow: hidden; }
+  .task-bar i { display: block; height: 100%; background: var(--coral); border-radius: 2px; transition: width .6s ease; }
+  .task-note { font-size: 11px; color: var(--ink3); margin-top: 8px; }
+  .task-open {
+    all: unset; cursor: pointer; font-family: var(--mono); font-size: 10.5px;
+    color: var(--coral); background: var(--coral-soft); padding: 4px 11px; border-radius: 100px;
+    margin-top: 10px; display: inline-block;
+  }
+  .task-open:hover { background: var(--coral); color: #141311; }
+
+  /* ---------- rail: home controls ---------- */
+  .hc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
+  .hc-row:first-of-type { margin-top: 4px; }
+  .hc-name { font-size: 12.5px; }
+  .hc-sub { font-family: var(--mono); font-size: 10px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctl-btn {
+    all: unset; cursor: pointer; flex: none; font-family: var(--mono); font-size: 11px;
+    padding: 3px 9px; border-radius: 6px; color: var(--ink2); background: var(--wash);
+  }
+  .ctl-btn:hover { color: var(--ink); }
+  .ctl-btn.active { color: #141311; background: var(--coral); }
+  .ctl-btn.wide { width: 26px; text-align: center; }
+  input[type="range"] { flex: 1; accent-color: var(--coral); height: 16px; min-width: 0; cursor: pointer; }
+  .val { font-family: var(--mono); font-size: 10px; color: var(--ink2); min-width: 32px; text-align: right; }
+  .swatches { display: flex; gap: 5px; margin-top: 7px; }
+  .sw { width: 15px; height: 15px; border-radius: 50%; cursor: pointer; border: 1.5px solid transparent; }
+  .sw.sel { border-color: var(--cream); }
+  .temp-ctl { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .temp-val { font-family: var(--serif); font-size: 22px; min-width: 52px; text-align: center; }
+
+  @media (max-width: 980px) {
+    .grid { flex-direction: column; }
+    .rail { flex: none; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-orb.active .bars i, .caret::after { animation: none; }
+    .stage .lane i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="brand">Watson</span>
+    <span class="brand-sub">full-duplex voice agent</span>
+    <span class="spacer"></span>
+    <span class="chip"><i class="ok"></i>Raspberry Pi · running</span>
+    <span class="chip"><i id="chip-spotify" class="off"></i><span id="chip-spotify-text">Spotify · connecting</span></span>
+  </div>
+
+  <div class="grid">
+    <div class="main-col">
+
+      <!-- hero -->
+      <section class="card hero-card">
+        <div class="hero-head">
+          <div class="hero-orb" id="hero-orb">
+            <div class="bars"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div>
+            <h1 class="state" id="state-headline">Listening</h1>
+            <div class="hero-sub" id="state-sub">Ready. Just start talking, no button needed.</div>
+          </div>
+        </div>
+
+        <div class="stage">
+          <div class="barge" id="barge-chip">barge-in</div>
+          <div class="lane-tag"><span class="who">Watson</span> · TTS</div>
+          <div class="lane agent" id="lane-agent"></div>
+          <div class="lane-tag" style="margin-top:10px"><span class="who">You</span> · mic</div>
+          <div class="lane you" id="lane-you"></div>
+        </div>
+
+        <div class="feed" id="feed">
+          <div id="conv-empty">
+            <span class="big">Just start talking — no button needed.</span>
+            <span class="hint-k">Start a line with <b>Watson</b> · say <b>goodbye</b> to end</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- home panel: full width, right under the stage -->
+      <section class="card" id="home-panel">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span class="card-title">Home, by voice</span>
+          <span class="card-sub">voice and dashboard drive the same state</span>
+        </div>
+        <div class="home-grid">
+          <div class="hgroup" id="hg-music"></div>
+          <div class="hgroup" id="hg-lights"></div>
+          <div class="hgroup" id="hg-climate"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="rail">
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span class="card-title">Pipeline</span>
+          <span class="card-sub">last turn</span>
+        </div>
+        <div id="pipeline"></div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span class="card-title">Turn-taking</span>
+          <span class="card-sub">this session</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">First audio</div><div class="v" id="st-audio">–</div></div>
+          <div class="stat"><div class="k">Total turn</div><div class="v" id="st-total">–</div></div>
+          <div class="stat"><div class="k">Barge-ins</div><div class="v" id="st-barge">0</div></div>
+          <div class="stat"><div class="k">Turns</div><div class="v" id="st-turns">0</div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span class="card-title">Background task</span>
+          <span class="card-sub">pi.dev &middot; task MCP</span>
+        </div>
+        <div id="task-box"><div class="task-note" style="margin-top:8px">No task running — you can keep talking while one runs.</div></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var feed = document.getElementById("feed");
+  var heroOrb = document.getElementById("hero-orb");
+  var headline = document.getElementById("state-headline");
+  var heroSub = document.getElementById("state-sub");
+  var laneAgent = document.getElementById("lane-agent");
+  var laneYou = document.getElementById("lane-you");
+  var bargeChip = document.getElementById("barge-chip");
+  var hgMusic = document.getElementById("hg-music");
+  var hgLights = document.getElementById("hg-lights");
+  var hgClimate = document.getElementById("hg-climate");
+
+  var N_BARS = 36;
+  var rendered = 0, typeTimer = null, lastReplyKey = null;
+  var jsonHome = {}, music = null, lastHomeSig = "", lastTasksSig = "";
+  var turnStats = { turns: 0, barges: 0 };
+  var waveTimer = null, pending = {};
+  var COLORS = [["warm white", "#f6e7c8"], ["white", "#f4f4f4"], ["blue", "#9ec9ff"],
+                ["red", "#f2938c"], ["green", "#9fd6a9"], ["yellow", "#f5e08e"]];
+
+  [laneAgent, laneYou].forEach(function (lane) {
+    for (var i = 0; i < N_BARS; i++) lane.appendChild(document.createElement("i"));
+  });
+
+  function animateWave(lane, intensity) {
+    var bars = lane.children;
+    for (var i = 0; i < bars.length; i++) {
+      var env = Math.sin((i / bars.length) * Math.PI);
+      var h = 8 + Math.random() * intensity * env * 90;
+      bars[i].style.height = Math.max(8, Math.min(96, h)) + "%";
+    }
+  }
+  function decay(lane) {
+    var bars = lane.children;
+    for (var i = 0; i < bars.length; i++) bars[i].style.height = (8 + Math.random() * 6) + "%";
+  }
+  function setLanes(agentOn, youOn) {
+    laneAgent.classList.toggle("live", !!agentOn);
+    laneYou.classList.toggle("live", !!youOn);
+    if (waveTimer) { clearInterval(waveTimer); waveTimer = null; }
+    if (agentOn || youOn) {
+      var step = function () {
+        if (agentOn) animateWave(laneAgent, 1); else decay(laneAgent);
+        if (youOn) animateWave(laneYou, 0.7); else decay(laneYou);
+      };
+      step();
+      waveTimer = setInterval(step, 120);
+    } else { decay(laneAgent); decay(laneYou); }
+  }
+  function showBarge() {
+    bargeChip.classList.add("show");
+    clearTimeout(showBarge.t);
+    showBarge.t = setTimeout(function () { bargeChip.classList.remove("show"); }, 3500);
+  }
+
+  /* ---------- transcript ---------- */
+  function fmt(s) {
+    return s != null ? s.toFixed(1) + " s" : null;
+  }
+  function turnBlock(side, text, dim, kind, anno) {
+    var d = document.createElement("div");
+    d.className = "turn" + (dim ? " dim" : "");
+    var role = document.createElement("div");
+    role.className = "role";
+    var who = document.createElement("span");
+    who.textContent = side === "u" ? "You" : "Watson";
+    role.appendChild(who);
+    if (kind) {
+      var k = document.createElement("span");
+      k.className = "kind"; k.textContent = kind;
+      role.appendChild(k);
+    }
+    var utt = document.createElement("div");
+    utt.className = "utt";
+    utt.textContent = text;
+    d.appendChild(role); d.appendChild(utt);
+    if (anno) {
+      var a = document.createElement("div");
+      a.className = "anno"; a.textContent = anno;
+      d.appendChild(a);
+    }
+    return d;
+  }
+
+  function renderConv(messages) {
+    var turns = messages.filter(function (m) { return m.type === "turn"; });
+    var entries = [];
+    turns.forEach(function (t) {
+      var h = t.heard || {};
+      if (h.text) entries.push({ side: "u", text: h.text, dim: h.accepted === false,
+        key: "u" + t.id, t: t.t, anno: null });
+      if (t.reply && t.reply.text) entries.push({ side: "w", text: t.reply.text,
+        key: "w" + t.id, kind: "tts", t: t.t,
+        anno: t.first_audio_s != null ? "\u2014 first audio in " + t.first_audio_s.toFixed(1) + " s" : null });
+    });
+    var empty = document.getElementById("conv-empty");
+    if (empty && entries.length) empty.remove();
+    var nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
+    var newCount = entries.length - rendered;
+    for (var i = rendered; i < entries.length; i++) {
+      var e = entries[i];
+      feed.appendChild(turnBlock(e.side, e.text, e.dim, e.kind, e.anno));
+    }
+    rendered = entries.length;
+    if (nearBottom) feed.scrollTop = feed.scrollHeight;   /* don't yank if reading up */
+    if (newCount > 0 && entries.length) {
+      var last = entries[entries.length - 1];
+      if (last.side === "u" && !last.dim) {
+        turnStats.turns++;
+        var prev = entries[entries.length - 2];
+        if (prev && prev.side === "w" && prev.t && (Date.now() / 1000 - prev.t) < 8) {
+          turnStats.barges++;
+          showBarge();
+        }
+      }
+      if (last.side === "w" && last.key !== lastReplyKey) {
+        typeOut(feed.lastChild.querySelector(".utt"), last.text);
+        lastReplyKey = last.key;
+      }
+    }
+    document.getElementById("st-turns").textContent = turnStats.turns;
+    document.getElementById("st-barge").textContent = turnStats.barges;
+    return turns;
+  }
+
+  function typeOut(node, text) {
+    if (typeTimer) clearInterval(typeTimer);
+    var i = 0, step = Math.max(1, Math.ceil(text.length / 90));
+    node.classList.add("caret");
+    typeTimer = setInterval(function () {
+      i = Math.min(text.length, i + step);
+      node.textContent = text.slice(0, i);
+      feed.scrollTop = feed.scrollHeight;
+      if (i >= text.length) {
+        clearInterval(typeTimer); typeTimer = null;
+        node.classList.remove("caret");
+      }
+    }, 22);
+  }
+
+  function setStatus(mode, turns) {
+    var lastT = turns.length ? turns[turns.length - 1] : null;
+    var nowS = Date.now() / 1000;
+    var speaking = mode === "speaking" ||
+      (lastT && lastT.reply && (nowS - (lastT.t || 0) < 6));
+    var listening = lastT && (nowS - (lastT.t || 0) < 600);
+    var state = speaking ? "speaking" : (listening ? "listening" : "idle");
+    heroOrb.classList.toggle("active", state !== "idle");
+    headline.textContent = speaking ? "Speaking" : (state === "listening" ? "Listening" : "Idle");
+    heroSub.textContent = speaking ? "Barge in any time — I'll stop and listen."
+      : (state === "listening" ? "Ready. Just start talking, no button needed."
+      : "Say \u201cWatson\u201d to wake me.");
+    setLanes(speaking, !speaking && state === "listening");
+  }
+
+  /* ---------- pipeline ---------- */
+  function renderPipeline(turns) {
+    var el = document.getElementById("pipeline");
+    var last = null;
+    for (var i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].total_s != null) { last = turns[i]; break; }
+    }
+    function row(name, desc, val, live) {
+      var r = document.createElement("div");
+      r.className = "pipe-row" + (live ? " live hl" : "");
+      r.appendChild(document.createElement("i"));
+      var box = document.createElement("div");
+      var n = document.createElement("div"); n.className = "pipe-name"; n.textContent = name;
+      var dd = document.createElement("div"); dd.className = "pipe-desc"; dd.textContent = desc;
+      box.appendChild(n); box.appendChild(dd); r.appendChild(box);
+      var v = document.createElement("div");
+      v.className = "pipe-val";
+      if (val != null) { var b = document.createElement("b"); b.textContent = val; v.appendChild(b); }
+      r.appendChild(v);
+      return r;
+    }
+    el.innerHTML = "";
+    el.appendChild(row("VAD", "Silero \u00b7 endpointing 600 ms", null, true));
+    el.appendChild(row("ASR", "Deepgram nova-3 \u00b7 streamed",
+      last && last.asr_s != null ? Math.round(last.asr_s * 1000) + " ms" : null, !!last));
+    // turn fields are cumulative from the endpoint: the talker's own time
+    // is first token minus ASR
+    el.appendChild(row("Reasoner", "glm-5.3-flash \u00b7 OpenRouter",
+      last && last.first_token_s != null && last.asr_s != null
+        ? Math.round(Math.max(0, last.first_token_s - last.asr_s) * 1000) + " ms" : null, !!last));
+    el.appendChild(row("TTS", "Deepgram Aura-2 \u00b7 streamed",
+      // tool turns: the "One sec." ack plays before the first token -> no value
+      last && last.first_audio_s != null && last.first_token_s != null
+        && last.first_audio_s >= last.first_token_s
+        ? Math.round((last.first_audio_s - last.first_token_s) * 1000) + " ms" : null, !!last));
+    el.appendChild(row("Harness", "pi.dev \u00b7 bwrap sandbox",
+      workingTask() ? "running" : "idle", !!workingTask()));
+    if (last) {
+      document.getElementById("st-audio").textContent = fmt(last.first_audio_s) || "\u2013";
+      document.getElementById("st-total").textContent = fmt(last.total_s) || "\u2013";
+    }
+  }
+
+  function workingTask() {
+    return (window.__tasks || []).filter(function (t) { return t.status === "working"; })[0] || null;
+  }
+
+  /* ---------- background task ---------- */
+  function renderTask(tasks) {
+    var box = document.getElementById("task-box");
+    var t = workingTask() || (tasks.length ? tasks[0] : null);
+    box.innerHTML = "";
+    if (!t) {
+      box.innerHTML = '<div class="task-note" style="margin-top:8px">No task running \u2014 you can keep talking while one runs.</div>';
+      return;
+    }
+    var name = document.createElement("div");
+    name.className = "task-name";
+    name.textContent = t.prompt || t.id;
+    var bar = document.createElement("div");
+    bar.className = "task-bar";
+    var fill = document.createElement("i");
+    var pct = t.status === "working"
+      ? Math.min(92, 10 + Math.round(((Date.now() / 1000 - (t.t0 || 0)) % 45) / 45 * 80))
+      : 100;
+    fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    var note = document.createElement("div");
+    note.className = "task-note";
+    note.textContent = t.status === "working"
+      ? "Running \u2014 you can keep talking while it works."
+      : "Finished \u2014 the result was announced.";
+    box.appendChild(name); box.appendChild(bar); box.appendChild(note);
+    if (t.status === "finished") {
+      var open = document.createElement("button");
+      open.className = "task-open";
+      open.textContent = "Open result";
+      open.addEventListener("click", function () {
+        window.open("/files/" + t.id + "/index.html", "_blank");
+      });
+      box.appendChild(open);
+    }
+  }
+
+  /* ---------- home panel: three columns ---------- */
+  function ghead(text) {
+    var g = document.createElement("div");
+    g.className = "ghead";
+    g.textContent = text;
+    return g;
+  }
+
+  function renderHome() {
+    var lights = (jsonHome && jsonHome.lights) || {};
+
+    /* --- music column --- */
+    hgMusic.innerHTML = "";
+    hgMusic.appendChild(ghead("Music"));
+    if (music) {
+      var ms = document.createElement("div");
+      ms.className = "hc-sub";
+      ms.style.cssText = "white-space:normal;margin-bottom:8px";
+      ms.textContent = music.track
+        ? (music.state === "playing" ? "\u25b6 " : "\u23f8 ") + music.track + " \u2014 " + music.artist
+        : "Nothing playing";
+      hgMusic.appendChild(ms);
+      var mBtns = document.createElement("div");
+      mBtns.style.cssText = "display:flex;gap:5px";
+      mBtns.appendChild(mkBtn("\u23ee", function () { callTool("spotify_prev", {}); }));
+      var pp = mkBtn(music.state === "playing" ? "\u23f8" : "\u25b6", function () {
+        callTool(music.state === "playing" ? "spotify_pause" : "spotify_play", {query: "music"});
+      });
+      if (music.state === "playing") pp.classList.add("active");
+      mBtns.appendChild(pp);
+      mBtns.appendChild(mkBtn("\u23ed", function () { callTool("spotify_next", {}); }));
+      hgMusic.appendChild(mBtns);
+      var vrow = document.createElement("div");
+      vrow.className = "ctl-row";
+      vrow.style.marginTop = "9px";
+      var vol = document.createElement("input");
+      vol.type = "range"; vol.min = 0; vol.max = 100;
+      vol.value = music.volume != null ? music.volume : 50;
+      var vv = document.createElement("span"); vv.className = "val"; vv.textContent = vol.value + "%";
+      vol.addEventListener("input", function () {
+        vv.textContent = vol.value + "%";
+        if (pending.vol) clearTimeout(pending.vol);
+        pending.vol = setTimeout(function () {
+          callTool("spotify_volume", {percent: parseInt(vol.value, 10)});
+        }, 250);
+      });
+      vrow.appendChild(vol); vrow.appendChild(vv);
+      hgMusic.appendChild(vrow);
+    } else {
+      var none = document.createElement("div");
+      none.className = "task-note";
+      none.textContent = "Spotify not connected \u2014 say \u201cplay music\u201d to use the virtual player.";
+      hgMusic.appendChild(none);
+    }
+
+    /* --- lights column --- */
+    hgLights.innerHTML = "";
+    hgLights.appendChild(ghead("Lights"));
+    var lnames = Object.keys(lights);
+    if (!lnames.length) {
+      var le = document.createElement("div");
+      le.className = "task-note";
+      le.textContent = "No lights yet \u2014 say \u201cturn on the lights\u201d.";
+      hgLights.appendChild(le);
+    }
+    lnames.forEach(function (name) {
+      var L = lights[name];
+      var row = document.createElement("div");
+      row.className = "hc-row";
+      var lbl = document.createElement("div");
+      lbl.style.minWidth = "0";
+      var ln = document.createElement("div"); ln.className = "hc-name";
+      ln.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      var ls = document.createElement("div"); ls.className = "hc-sub";
+      ls.textContent = L.on ? "on \u00b7 " + (L.brightness || 100) + "% \u00b7 " + (L.color || "") : "off";
+      lbl.appendChild(ln); lbl.appendChild(ls);
+      row.appendChild(lbl);
+      var tog = mkBtn(L.on ? "on" : "off", function () {
+        callTool("lights_control", {light: name, on: !L.on ? "true" : "false"});
+      });
+      if (L.on) tog.classList.add("active");
+      row.appendChild(tog);
+      hgLights.appendChild(row);
+      if (L.on) {
+        var brow = document.createElement("div");
+        brow.className = "ctl-row";
+        var br = document.createElement("input");
+        br.type = "range"; br.min = 1; br.max = 100; br.value = L.brightness || 100;
+        var bv = document.createElement("span"); bv.className = "val"; bv.textContent = (L.brightness || 100) + "%";
+        br.addEventListener("input", function () {
+          bv.textContent = br.value + "%";
+          var key = "br" + name;
+          if (pending[key]) clearTimeout(pending[key]);
+          pending[key] = setTimeout(function () {
+            callTool("lights_control", {light: name, brightness_percent: parseInt(br.value, 10)});
+          }, 250);
+        });
+        brow.appendChild(br); brow.appendChild(bv);
+        hgLights.appendChild(brow);
+        var sw = document.createElement("div");
+        sw.className = "swatches";
+        COLORS.forEach(function (pair) {
+          var s = document.createElement("span");
+          s.className = "sw" + (L.color === pair[0] ? " sel" : "");
+          s.style.background = pair[1]; s.title = pair[0];
+          s.addEventListener("click", function () {
+            callTool("lights_control", {light: name, color: pair[0]});
+          });
+          sw.appendChild(s);
+        });
+        hgLights.appendChild(sw);
+      }
+    });
+
+    /* --- climate + reminders column --- */
+    hgClimate.innerHTML = "";
+    hgClimate.appendChild(ghead("Climate & reminders"));
+    var th = (jsonHome && jsonHome.thermostat) || {};
+    var target = th.target != null ? th.target : 22;
+    var trow = document.createElement("div");
+    trow.className = "temp-ctl";
+    var minus = mkBtn("\u2212", function () { callTool("thermostat_set", {degrees: target - 1}); });
+    minus.classList.add("wide");
+    var val = document.createElement("span"); val.className = "temp-val"; val.textContent = target + "\u00b0";
+    var plus = mkBtn("+", function () { callTool("thermostat_set", {degrees: target + 1}); });
+    plus.classList.add("wide");
+    trow.appendChild(minus); trow.appendChild(val); trow.appendChild(plus);
+    hgClimate.appendChild(trow);
+    var rems = (jsonHome && jsonHome.reminders) || [];
+    if (!rems.length) {
+      var re = document.createElement("div");
+      re.className = "task-note";
+      re.textContent = "No reminders \u2014 say \u201cremind me to\u2026\u201d";
+      hgClimate.appendChild(re);
+    }
+    rems.slice(0, 4).forEach(function (r) {
+      var row = document.createElement("div");
+      row.className = "hc-row";
+      var lbl = document.createElement("div");
+      lbl.className = "hc-sub";
+      lbl.style.whiteSpace = "normal";
+      lbl.textContent = "\u2022 " + r.text + (r.when ? " (" + r.when + ")" : "");
+      row.appendChild(lbl);
+      hgClimate.appendChild(row);
+    });
+  }
+
+  function mkBtn(text, fn) {
+    var b = document.createElement("button");
+    b.className = "ctl-btn";
+    b.textContent = text;
+    b.addEventListener("click", function () { fn(); });
+    return b;
+  }
+
+  function callTool(name, args) {
+    return fetch("/api/tool", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name: name, args: args})
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) {
+        jsonHome = d.home; music = d.music;
+        lastHomeSig = JSON.stringify(d.home);
+        renderHome();
+      }
+      return d;
+    }).catch(function () { return {ok: false}; });
+  }
+
+  /* ---------- poll ---------- */
+  function poll() {
+    fetch("/api/state").then(function (r) { return r.json(); }).then(function (d) {
+      var msgs = d.messages || [];
+      var turns = msgs.filter(function (m) { return m.type === "turn"; });
+      setStatus(d.state ? d.state.mode : "idle", turns);
+      renderConv(msgs);
+      renderPipeline(turns);
+      var tasks = d.tasks || [];
+      window.__tasks = tasks;
+      var tSig = JSON.stringify(tasks);
+      if (tSig !== lastTasksSig) { lastTasksSig = tSig; renderTask(tasks); }
+      if (d.music !== undefined) music = d.music;
+      if (d.home) {
+        jsonHome = d.home;
+        var hSig = JSON.stringify(d.home);
+        if (hSig !== lastHomeSig) { lastHomeSig = hSig; renderHome(); }
+      }
+      var sp = document.getElementById("chip-spotify");
+      var spTxt = document.getElementById("chip-spotify-text");
+      var connected = !!d.music;
+      sp.className = connected ? "ok" : "off";
+      spTxt.textContent = connected ? "Spotify \u00b7 connected" : "Spotify \u00b7 not connected";
+    }).catch(function () {});
+  }
+  poll();
+  setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>
