@@ -82,21 +82,25 @@ cd fd-benchmark && ./.venv/bin/python -m fdbench run --student me3 --rounds 2 --
 # quick latency-only check (~8 min): --rounds 0 --phrases 10 --runs 2 --judge-provider none
 ```
 
-Latest full run: Nov 7, `results/run-2026-11-07-pi/` (fdbench run `2026-11-07_10-10-53`):
+Latest full run (the one the deck presents): Nov 7, `results/run-2026-11-07-pi-3rounds/`
+(fdbench run `2026-11-07_11-22-33`, 3 rounds, 30 timed turns):
 
 | Metric | Nov 6 (before streaming) | Nov 7 |
 |---|---|---|
-| E2E median / p95 | 4.72 / 7.49 s | **2.56 / 3.93 s** |
-| ASR median | 0.92 s | 0.24 s |
-| LLM first token median / p95 | 2.10 / 4.28 s | 1.99 / 3.26 s |
-| TTS first audio median | 1.45 s | 0.29 s |
-| WER | 11.1 % | 12.1 % |
-| Pause take-overs | 1/4 | 0/4 |
-| Interruptions handled | 0/1 | 2/2 (judge 5.0/5) |
-| Answered speech not meant for it | 1/4 | 0/4 |
-| Context per LLM call | not reported | 1,670 prompt tokens median, 12 messages |
+| E2E median / p95 | 4.72 / 7.49 s | **2.57 / 6.27 s** |
+| ASR median | 0.92 s | 0.28 s |
+| LLM first token median / p95 | 2.10 / 4.28 s | 2.02 / 4.78 s |
+| TTS first audio median | 1.45 s | 0.30 s |
+| Barge-in, playback stopped (mean / p95) | not measured | 0.77 / 0.79 s |
+| WER | 11.1 % | 10.6 % |
+| Interruptions handled | 0/1 | 3/3 (judge 5.0/5) |
+| Backchannel resume | 1/2 | 2/3 |
+| Pause take-overs | 1/4 | 1/6 |
+| Answered speech not meant for it | 1/4 | 2/6 (side talk only) |
+| Context per LLM call | not reported | 1,665 prompt tokens median, 12 messages |
 
-Full-Duplex-Bench groups have n = 2, so single trials flip between runs. History, earlier runs and the
+Full-Duplex-Bench groups have n = 3, so single trials flip between runs. The E2E p95 comes
+from slow LLM first tokens on a few turns. History, earlier runs and the
 gate trade-off: [RESULTS.md](RESULTS.md) and [docs/paper.md](docs/paper.md).
 
 ## Files

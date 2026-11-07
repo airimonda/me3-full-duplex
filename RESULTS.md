@@ -2,24 +2,32 @@
 
 ## Latest — Nov 7, 2026: Watson on the Pi, streaming ASR/LLM/TTS
 
-fdbench run `2026-11-07_10-10-53` (copied to `results/run-2026-11-07-pi/`): Watson on the Raspberry Pi 4,
-harness on the Mac (`--where remote`), 2 rounds of Full-Duplex-Bench + 30 timed turns, judge
-openrouter/gpt-4o. Code: `main` after PR #3.
+Presented run (the deck's numbers): fdbench run `2026-11-07_11-22-33` (copied to
+`results/run-2026-11-07-pi-3rounds/`): Watson on the Raspberry Pi 4, harness on the Mac
+(`--where remote`), 3 rounds of Full-Duplex-Bench (30 trials) + 30 timed turns (10 phrases x 3),
+judge openrouter/gpt-4o. Code: `main` after PR #5.
 
-| Metric | Nov 6 (run 23-27-10) | Nov 7 (run 10-10-53) |
-|---|---|---|
-| E2E, end of speech → audio out (median / mean / p95) | 4.72 / 5.22 / 7.49 s | **2.56 / 2.67 / 3.93 s** |
-| ASR final (median / p95) | 0.92 / 1.67 s | 0.24 / 0.30 s |
-| LLM first token (median / p95) | 2.10 / 4.28 s | 1.99 / 3.26 s |
-| TTS first audio (median / p95) | 1.45 / 3.25 s | 0.29 / 0.40 s |
-| WER | 11.1 % | 12.1 % |
-| Pause take-overs | 1/4 | 0/4 |
-| Turn-taking missed | 1/2 | 1/2 |
-| Answered speech not meant for it | 1/4 | 0/4 |
-| Interruptions handled | 0/1 | 2/2, judge 5.0/5 |
-| Backchannel resume | 1/2 | 1/2 |
-| Context per LLM call | not reported | 1,670 prompt tokens median (max 1,994), 12 messages |
-| Pi peak temperature | 68 °C | 73 °C, never throttled |
+The earlier 2-round run `2026-11-07_10-10-53` (code after PR #3, copied to
+`results/run-2026-11-07-pi/`) is kept for comparison.
+
+| Metric | Nov 6 (run 23-27-10) | Nov 7 (run 10-10-53, 2 rounds) | Nov 7 (run 11-22-33, 3 rounds) |
+|---|---|---|---|
+| E2E, end of speech → audio out (median / mean / p95) | 4.72 / 5.22 / 7.49 s | 2.56 / 2.67 / 3.93 s | **2.57 / 3.20 / 6.27 s** |
+| ASR final (median / p95) | 0.92 / 1.67 s | 0.24 / 0.30 s | 0.28 / 0.42 s |
+| LLM first token (median / p95) | 2.10 / 4.28 s | 1.99 / 3.26 s | 2.02 / 4.78 s |
+| TTS first audio (median / p95) | 1.45 / 3.25 s | 0.29 / 0.40 s | 0.30 / 1.45 s |
+| Barge-in, playback stopped (mean / p95) | not measured | 0.75 / 0.76 s | 0.77 / 0.79 s |
+| WER | 11.1 % | 12.1 % | 10.6 % |
+| Pause take-overs | 1/4 | 0/4 | 1/6 |
+| Turn-taking missed | 1/2 | 1/2 | 1/3 |
+| Answered speech not meant for it | 1/4 | 0/4 | 2/6 (side talk; TV, noise, background 0) |
+| Interruptions handled | 0/1 | 2/2, judge 5.0/5 | 3/3, judge 5.0/5 |
+| Backchannel resume | 1/2 | 1/2 | 2/3 |
+| Context per LLM call | not reported | 1,670 prompt tokens median (max 1,994), 12 messages | 1,665 prompt tokens median (max 2,107), 12 messages (max 15) |
+| Pi peak temperature | 68 °C | 73 °C, never throttled | 74 °C, never throttled |
+
+The two Nov 7 runs have the same E2E median. The 3-round run has a longer tail: a few turns had
+slow LLM first tokens (TTFT p95 4.78 s), which moves the E2E p95 from 3.93 s to 6.27 s.
 
 What changed, each step checked first with a stage-latency-only run (10 phrases × 2) on the Pi:
 
