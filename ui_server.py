@@ -46,12 +46,27 @@ SANDBOX = os.path.expanduser("~/sandbox")
 app = FastAPI()
 
 
-def _spotify_connected():
-    p = os.path.expanduser("~/.hermes/.env")
+def _music_now():
+    """What the music chip and player show. On the Mac: the Spotify app's
+    own status. On the Pi there is no app: report the player state the music
+    tool keeps (commands are played on the Mac by mac_show.py), when the
+    Spotify keys are present."""
     try:
-        return "SPOTIFY_REFRESH_TOKEN" in open(p).read()
-    except OSError:
-        return False
+        st = home.spotify_status() if home._ON_MAC else None
+    except Exception:
+        st = None
+    if st is not None or home._ON_MAC or not home.spotify_configured():
+        return st
+    p = (_home_state() or {}).get("player") or {}
+    track = p.get("query") or "-"
+    name, _, artist = track.partition(" - ")
+    return {"state": p.get("state", "stopped"), "track": name, "artist": artist or "-",
+            "volume": p.get("volume")}
+
+
+def _spotify_connected():
+    # same key lookup as the music tool (env, ~/.hermes/.env, ~/me3/.env)
+    return home.spotify_configured()
 
 
 def _home_state():
@@ -241,10 +256,7 @@ async def api_state():
     msgs = []
     for _, e in log_entries():
         msgs.extend(entries_to_messages(e))
-    try:
-        music_real = home.spotify_status()
-    except Exception:
-        music_real = None
+    music_real = _music_now()
     return JSONResponse({"messages": msgs, "state": dashboard_state(),
                          "tasks": tasks_scan(), "home": _home_state(),
                          "music": music_real})
@@ -265,10 +277,7 @@ async def api_tool(req: dict):
         out = home.do_tool(name, args)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    try:
-        music_real = home.spotify_status()
-    except Exception:
-        music_real = None
+    music_real = _music_now()
     return JSONResponse({"ok": True, "reply": out, "state": dashboard_state(),
                          "home": _home_state(), "music": music_real})
 

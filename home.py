@@ -7,13 +7,19 @@ otherwise a virtual player in the sandbox.
 
 Spotify creds (any of these locations):
   SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN
-  in ~/.hermes/.env or the environment.
+  in the environment, ~/.hermes/.env or ~/me3/.env (the Pi).
+
+Playback drives the Spotify desktop app with AppleScript. On the Pi (not
+macOS) there is no Spotify app: each command is queued as a structured
+{"kind": "spotify", ...} event in the show log, and mac_show.py on the Mac
+plays it with a fixed AppleScript (never a script sent from the Pi).
 """
 import base64
 import json
 import os
 import re
 import subprocess
+import sys
 import time
 import urllib.parse
 
@@ -27,13 +33,41 @@ def _env_key(name):
     v = os.environ.get(name)
     if v:
         return v
-    envpath = os.path.expanduser("~/.hermes/.env")
-    if os.path.exists(envpath):
-        for line in open(envpath):
-            line = line.strip()
-            if line.startswith(name + "="):
-                return line.split("=", 1)[1].strip().strip('"')
+    for envpath in (os.path.expanduser("~/.hermes/.env"), os.path.expanduser("~/me3/.env")):
+        if os.path.exists(envpath):
+            for line in open(envpath):
+                line = line.strip()
+                if line.startswith(name + "="):
+                    return line.split("=", 1)[1].strip().strip('"')
     return None
+
+
+def spotify_configured():
+    """True when the keys for search + playback control are present."""
+    return bool(_env_key("SPOTIFY_CLIENT_ID") and _env_key("SPOTIFY_REFRESH_TOKEN"))
+
+
+# On the Pi: Spotify commands go to the Mac through the show log (mac_show.py)
+_ON_MAC = sys.platform == "darwin"
+_SHOW_LOG = os.path.expanduser(os.environ.get("ME3_SHOW_LOG") or "~/me3/runs/live/show.jsonl")
+
+
+def _to_mac(action, **kw):
+    """Queue a Spotify command for mac_show.py. Returns True when queued."""
+    try:
+        os.makedirs(os.path.dirname(_SHOW_LOG), exist_ok=True)
+        with open(_SHOW_LOG, "a") as f:
+            f.write(json.dumps({"t": round(time.time(), 3), "kind": "spotify",
+                                "action": action, **kw}) + "\n")
+        return True
+    except OSError:
+        return False
+
+
+def _player(**kw):
+    st = _load_state()
+    st.setdefault("player", {}).update(kw)
+    _save_state(st)
 
 
 def _load_state():
@@ -92,9 +126,21 @@ def spotify_search(query, kind="track"):
     if not h:
         return None
     r = httpx.get(f"{SPOTIFY_API}/search",
-                  params={"q": query, "type": kind, "limit": 1}, headers=h, timeout=15)
-    items = r.json().get(f"{kind}s", {}).get("items", [])
-    return items[0] if items else None
+                  params={"q": query, "type": kind, "limit": 10}, headers=h, timeout=15)
+    items = [i for i in r.json().get(f"{kind}s", {}).get("items", []) if i]
+    if not items:
+        return None
+    # Spotify's own top hit is often unrelated ("Love Story Taylor Swift" ->
+    # Katy Perry, Nov 7): pick the hit whose title + artist share the most
+    # words with the request; ties keep Spotify's order.
+    def words(t):
+        return set(re.findall(r"[a-z0-9]+", (t or "").lower())) - {"by", "the", "a", "song", "play"}
+    want = words(query)
+
+    def score(it):
+        names = [it.get("name", "")] + [a.get("name", "") for a in it.get("artists") or []]
+        return len(want & words(" ".join(names)))
+    return max(items, key=lambda it: (score(it), -items.index(it)))
 
 
 def spotify_status():
@@ -144,6 +190,17 @@ def _virtual_note(query):
 
 def spotify_play(query):
     item = spotify_search(query)
+    if not _ON_MAC:
+        if item:
+            name = item.get("name", query)
+            artist = (item.get("artists") or [{}])[0].get("name", "")
+            _to_mac("play", uri=item.get("uri"))
+            _player(state="playing", query=f"{name} - {artist}" if artist else name,
+                    since=time.time())
+            return f"Playing {name} by {artist} on Spotify."
+        _to_mac("play")   # nothing found (or no keys): resume whatever was playing
+        _player(state="playing", query=query or "Spotify", since=time.time())
+        return "Playing music on Spotify."
     if not item:
         # no API search (no creds at all) — still try direct AppleScript play
         ok, err = _as(f'tell application "Spotify" to play')
@@ -163,6 +220,10 @@ def spotify_play(query):
 
 
 def spotify_pause():
+    if not _ON_MAC:
+        _to_mac("pause")
+        _player(state="paused")
+        return "Paused."
     ok, _ = _as('tell application "Spotify" to pause')
     if ok:
         return "Paused."
@@ -173,17 +234,27 @@ def spotify_pause():
 
 
 def spotify_next():
+    if not _ON_MAC:
+        _to_mac("next")
+        return "Skipped to the next track."
     ok, _ = _as('tell application "Spotify" to next track')
     return "Skipped to the next track." if ok else "Skip failed — is Spotify open?"
 
 
 def spotify_prev():
+    if not _ON_MAC:
+        _to_mac("prev")
+        return "Previous track."
     ok, _ = _as('tell application "Spotify" to previous track')
     return "Previous track." if ok else "Skip-back failed — is Spotify open?"
 
 
 def spotify_volume(pct):
     pct = max(0, min(100, int(pct)))
+    if not _ON_MAC:
+        _to_mac("volume", percent=pct)
+        _player(volume=pct)
+        return f"Volume set to {pct}%."
     ok, _ = _as(f'tell application "Spotify" to set sound volume to {pct}')
     if ok:
         return f"Volume set to {pct}%."
