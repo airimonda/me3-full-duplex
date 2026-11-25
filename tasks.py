@@ -26,6 +26,31 @@ _running = {}   # id -> {"proc": Popen, "dir": str, "log": str, "prompt": str, "
 _finished = {}  # id -> {"status": "done"/"failed", "result": str, "files": [str], "elapsed_s": float}
 
 
+# Owner profile (Nov 7, owner request): the agent declined "look me up and
+# make a page" as doxxing a private person, and it has no web search. The
+# owner writes the details she wants public in this file; every job is told
+# who it works for, so a page about "me"/the owner is her own page built
+# from her own details. It does NOT cover other people.
+OWNER_PROFILE = os.path.expanduser(os.environ.get("ME3_OWNER_PROFILE", "~/me3/owner_profile.md"))
+
+
+def _owner_context():
+    try:
+        text = open(OWNER_PROFILE).read().strip()
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    return (
+        "\nWho you work for: the request comes from the owner of this assistant, "
+        "speaking to it by voice (her identity is checked by voice). If the task is "
+        "about the owner, 'me', 'my' or her name (speech recognition may misspell it), "
+        "it is her OWN page, made at her request with details she wrote herself for "
+        "publishing. Use only these details (do not search for or add other personal "
+        "data):\n---\n" + text[:3000] + "\n---\n"
+    )
+
+
 def _task_prompt(restatement):
     # timers/reminders are their own kind of task: wait, then report
     m = re.search(r"timer.*?(\d+)\s*(second|minute|hour)", restatement, flags=re.I)
@@ -37,6 +62,7 @@ def _task_prompt(restatement):
     return (
         "You are working in a sandbox folder that you must never write outside of. Task: "
         + restatement.strip() + "\n"
+        + _owner_context() +
         "Create the deliverable in the CURRENT folder only (for a website: a single "
         "index.html with inline CSS, self-contained, no external requests). Keep it "
         "simple and working. Never create, modify or delete files anywhere else. "
